@@ -1,10 +1,10 @@
-# 🔍 CareerLens
+# CareerLens
 
-A full-stack application built with **Next.js** (frontend) and **FastAPI** (backend).
+An AI-powered internship recommendation engine with resume analysis and job matching.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 CareerLens/
@@ -23,7 +23,7 @@ CareerLens/
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -90,7 +90,7 @@ pip freeze > requirements.txt      # Update the requirements file
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer    | Technology |
 | -------- | ---------- |
@@ -100,6 +100,6 @@ pip freeze > requirements.txt      # Update the requirements file
 
 ---
 
-## 📄 License
+## License
 
 MIT

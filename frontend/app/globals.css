@@ -438,9 +438,8 @@ body {
 /* ── Responsive: Navbar ── */
 @media (max-width: 768px) {
 
-  /* Hide desktop nav links on mobile — Navbar uses inline styles,
-     so we target via a wrapper that we'll mark with data attribute */
-  nav>div>div:nth-child(2) {
+  /* Hide desktop nav links on mobile */
+  .desktop-links {
     display: none !important;
   }
 

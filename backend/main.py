@@ -1,27 +1,30 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from routers import auth, resume, preferences, internships, recommendations, stats
 
-app = FastAPI(
-    title="CareerLens API",
-    description="Backend API for CareerLens",
-    version="0.1.0",
-)
+app = FastAPI(title="CareerLens Backend")
 
-# CORS configuration — allows the Next.js frontend to talk to this API
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"], # In production, specify frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Include Routers
+app.include_router(auth.router)
+app.include_router(resume.router)
+app.include_router(preferences.router)
+app.include_router(internships.router)
+app.include_router(recommendations.router)
+app.include_router(stats.router)
 
 @app.get("/")
-async def root():
-    return {"message": "Welcome to the CareerLens API"}
-
+def read_root():
+    return {"message": "Welcome to CareerLens API"}
 
 @app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+def health_check():
+    return {"status": "ok"}

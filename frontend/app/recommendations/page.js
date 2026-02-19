@@ -1,89 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-
-// Sample recommendation data (will be replaced by API data)
-const sampleRecommendations = [
-    {
-        id: 1,
-        company: "TechNova Inc.",
-        role: "Frontend Engineering Intern",
-        location: "San Francisco, CA",
-        type: "Hybrid",
-        match: 96,
-        skills: ["React", "TypeScript", "CSS", "Git"],
-        description:
-            "Join our engineering team to build beautiful, performant web applications used by millions. Work alongside senior engineers on real product features.",
-        posted: "2 days ago",
-        salary: "$35-45/hr",
-    },
-    {
-        id: 2,
-        company: "DataFlow AI",
-        role: "Machine Learning Intern",
-        location: "New York, NY",
-        type: "Remote",
-        match: 91,
-        skills: ["Python", "TensorFlow", "SQL", "Data Analysis"],
-        description:
-            "Help build and deploy ML models that power intelligent document processing. Gain hands-on experience with production ML systems.",
-        posted: "5 days ago",
-        salary: "$40-50/hr",
-    },
-    {
-        id: 3,
-        company: "CloudScale Systems",
-        role: "Backend Engineering Intern",
-        location: "Seattle, WA",
-        type: "On-site",
-        match: 87,
-        skills: ["Node.js", "Python", "AWS", "Docker"],
-        description:
-            "Design and build scalable microservices that handle millions of requests. Cloud infrastructure experience is a plus.",
-        posted: "1 week ago",
-        salary: "$38-48/hr",
-    },
-    {
-        id: 4,
-        company: "DesignCraft Studio",
-        role: "UI/UX Design Intern",
-        location: "Austin, TX",
-        type: "Remote",
-        match: 82,
-        skills: ["Figma", "CSS", "Design Systems", "Prototyping"],
-        description:
-            "Work with our design team to create intuitive, accessible interfaces for our SaaS platform. Strong visual design sense required.",
-        posted: "3 days ago",
-        salary: "$30-40/hr",
-    },
-    {
-        id: 5,
-        company: "SecureNet Labs",
-        role: "Cybersecurity Intern",
-        location: "Washington, DC",
-        type: "Hybrid",
-        match: 78,
-        skills: ["Python", "Linux", "Networking", "Security"],
-        description:
-            "Assist in vulnerability assessments, penetration testing, and security audits. Learn from experienced security professionals.",
-        posted: "1 week ago",
-        salary: "$35-45/hr",
-    },
-    {
-        id: 6,
-        company: "MobileFirst Apps",
-        role: "Mobile Development Intern",
-        location: "Los Angeles, CA",
-        type: "On-site",
-        match: 74,
-        skills: ["React Native", "JavaScript", "REST APIs", "Firebase"],
-        description:
-            "Build cross-platform mobile apps from scratch. Ship features to the App Store and Google Play.",
-        posted: "4 days ago",
-        salary: "$32-42/hr",
-    },
-];
+import { fetchAPI } from "../../lib/api";
+import { supabase } from "../../lib/supabase";
+import { useRouter } from "next/navigation";
 
 const filterOptions = ["All", "Remote", "On-site", "Hybrid"];
 
@@ -117,8 +38,51 @@ function getTypeBadgeColor(type) {
 export default function RecommendationsPage() {
     const [activeFilter, setActiveFilter] = useState("All");
     const [sortBy, setSortBy] = useState("match");
+    const [recommendations, setRecommendations] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState(null);
+    const router = useRouter();
 
-    const filtered = sampleRecommendations
+    useEffect(() => {
+        const getUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                // router.push("/login?message=Please log in to view recommendations");
+                setLoading(false);
+                return;
+            }
+            setUser(user);
+            fetchRecommendations(user.id);
+        };
+        getUser();
+    }, []);
+
+    const fetchRecommendations = async (userId) => {
+        try {
+            const data = await fetchAPI(`/recommendations/${userId}`);
+
+            const formatted = data.map(item => ({
+                id: item.internship.id,
+                company: item.internship.company,
+                role: item.internship.role,
+                location: item.internship.location || "Unknown",
+                type: item.internship.work_type || "Unknown",
+                match: item.match_score,
+                skills: item.internship.skills || [],
+                description: item.internship.description || "No description available",
+                posted: item.internship.posted_at ? new Date(item.internship.posted_at).toLocaleDateString() : "Recently",
+                salary: item.internship.salary || "Unpaid",
+                apply_url: item.internship.apply_url
+            }));
+            setRecommendations(formatted);
+        } catch (err) {
+            console.error("Error fetching recommendations:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filtered = recommendations
         .filter((r) => activeFilter === "All" || r.type === activeFilter)
         .sort((a, b) => {
             if (sortBy === "match") return b.match - a.match;
@@ -186,78 +150,88 @@ export default function RecommendationsPage() {
                 </p>
 
                 {/* Cards */}
-                <div style={styles.cardList}>
-                    {filtered.map((rec, i) => {
-                        const typeBadge = getTypeBadgeColor(rec.type);
-                        return (
-                            <div
-                                key={rec.id}
-                                className="card animate-fade-in-up"
-                                style={{
-                                    ...styles.recCard,
-                                    animationDelay: `${(i + 2) * 100}ms`,
-                                }}
-                            >
-                                <div style={styles.cardTop}>
-                                    <div style={styles.companyRow}>
-                                        <div style={styles.companyAvatar}>
-                                            {rec.company.charAt(0)}
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: '40px' }}>Loading recommendations...</div>
+                ) : (
+                    <div style={styles.cardList}>
+                        {filtered.map((rec, i) => {
+                            const typeBadge = getTypeBadgeColor(rec.type);
+                            return (
+                                <div
+                                    key={rec.id}
+                                    className="card animate-fade-in-up"
+                                    style={{
+                                        ...styles.recCard,
+                                        animationDelay: `${(i + 2) * 100}ms`,
+                                    }}
+                                >
+                                    <div style={styles.cardTop}>
+                                        <div style={styles.companyRow}>
+                                            <div style={styles.companyAvatar}>
+                                                {rec.company.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <h3 style={styles.roleName}>{rec.role}</h3>
+                                                <p style={styles.companyName}>{rec.company}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h3 style={styles.roleName}>{rec.role}</h3>
-                                            <p style={styles.companyName}>{rec.company}</p>
+                                        <div
+                                            style={{
+                                                ...styles.matchBadge,
+                                                background: getMatchBg(rec.match),
+                                                color: getMatchColor(rec.match),
+                                            }}
+                                        >
+                                            {rec.match}% match
                                         </div>
                                     </div>
-                                    <div
-                                        style={{
-                                            ...styles.matchBadge,
-                                            background: getMatchBg(rec.match),
-                                            color: getMatchColor(rec.match),
-                                        }}
-                                    >
-                                        {rec.match}% match
-                                    </div>
-                                </div>
 
-                                <p style={styles.recDesc}>{rec.description}</p>
+                                    <p style={styles.recDesc}>{rec.description}</p>
 
-                                <div style={styles.metaRow}>
-                                    <span style={styles.metaItem}>📍 {rec.location}</span>
-                                    <span
-                                        style={{
-                                            ...styles.typeBadge,
-                                            background: typeBadge.bg,
-                                            color: typeBadge.color,
-                                        }}
-                                    >
-                                        {rec.type}
-                                    </span>
-                                    <span style={styles.metaItem}>💰 {rec.salary}</span>
-                                    <span style={styles.metaItem}>🕐 {rec.posted}</span>
-                                </div>
-
-                                <div style={styles.skillsRow}>
-                                    {rec.skills.map((skill) => (
-                                        <span key={skill} style={styles.skillChip}>
-                                            {skill}
+                                    <div style={styles.metaRow}>
+                                        <span style={styles.metaItem}>📍 {rec.location}</span>
+                                        <span
+                                            style={{
+                                                ...styles.typeBadge,
+                                                background: typeBadge.bg,
+                                                color: typeBadge.color,
+                                            }}
+                                        >
+                                            {rec.type}
                                         </span>
-                                    ))}
-                                </div>
+                                        <span style={styles.metaItem}>💰 {rec.salary}</span>
+                                        <span style={styles.metaItem}>🕐 {rec.posted}</span>
+                                    </div>
 
-                                <div style={styles.cardActions}>
-                                    <button className="btn btn-primary" style={styles.applyBtn}>
-                                        Apply Now
-                                    </button>
-                                    <button className="btn btn-ghost" style={styles.saveBtn}>
-                                        ♡ Save
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
+                                    <div style={styles.skillsRow}>
+                                        {rec.skills.map((skill, idx) => (
+                                            <span key={`${rec.id}-skill-${idx}`} style={styles.skillChip}>
+                                                {skill}
+                                            </span>
+                                        ))}
+                                    </div>
 
-                {filtered.length === 0 && (
+                                    <div style={styles.cardActions}>
+                                        <a
+                                            href={rec.apply_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="btn btn-primary"
+                                            style={{ ...styles.applyBtn, textDecoration: 'none', display: 'inline-block' }}
+                                        >
+                                            Apply Now
+                                        </a>
+                                        <button className="btn btn-ghost" style={styles.saveBtn}>
+                                            ♡ Save
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {!loading && filtered.length === 0 && (
                     <div style={styles.emptyState}>
                         <span style={{ fontSize: "3rem" }}>🔍</span>
                         <h3 style={styles.emptyTitle}>No matches found</h3>
@@ -271,6 +245,11 @@ export default function RecommendationsPage() {
                             </Link>
                             .
                         </p>
+                        {!user && (
+                            <p style={{ marginTop: '10px' }}>
+                                Please <Link href="/login" style={{ color: 'var(--primary)' }}>login</Link> to see personalized recommendations.
+                            </p>
+                        )}
                     </div>
                 )}
             </div>

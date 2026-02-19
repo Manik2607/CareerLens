@@ -1,13 +1,51 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { fetchAPI } from "../../lib/api";
 
-const stats = [
-    { value: 10000, suffix: "+", label: "Internships Indexed", icon: "🏢" },
-    { value: 95, suffix: "%", label: "Match Accuracy", icon: "🎯" },
-    { value: 5000, suffix: "+", label: "Resumes Analyzed", icon: "📄" },
-    { value: 2, suffix: "s", label: "Average Response Time", icon: "⚡" },
+const defaultStats = [
+    { value: 1240, suffix: "+", label: "Internships Indexed", icon: "🏢", key: "active_internships" },
+    { value: 95, suffix: "%", label: "Match Accuracy", icon: "🎯", key: "accuracy" },
+    { value: 850, suffix: "+", label: "Resumes Analyzed", icon: "📄", key: "resumes_analyzed" },
+    { value: 50, suffix: "+", label: "Companies Hiring", icon: "⚡", key: "companies_hiring" },
 ];
+
+export default function StatsSection() {
+    const [statsData, setStatsData] = useState(defaultStats);
+
+    useEffect(() => {
+        const loadStats = async () => {
+            try {
+                const data = await fetchAPI('/stats');
+                const newStats = defaultStats.map(stat => {
+                    if (data[stat.key] !== undefined) {
+                        return { ...stat, value: data[stat.key] };
+                    }
+                    return stat;
+                });
+                setStatsData(newStats);
+            } catch (err) {
+                // console.error("Failed to load stats", err);
+                // Keep defaults on error
+            }
+        }
+        loadStats();
+    }, []);
+
+    return (
+        <section style={counterStyles.section}>
+            <div style={counterStyles.grid}>
+                {statsData.map((stat) => (
+                    <div key={stat.label} style={counterStyles.statCard}>
+                        <span style={counterStyles.icon}>{stat.icon}</span>
+                        <AnimatedCounter value={stat.value} suffix={stat.suffix} />
+                        <span style={counterStyles.label}>{stat.label}</span>
+                    </div>
+                ))}
+            </div>
+        </section>
+    );
+}
 
 function AnimatedCounter({ value, suffix }) {
     const [count, setCount] = useState(0);
@@ -15,6 +53,10 @@ function AnimatedCounter({ value, suffix }) {
     const started = useRef(false);
 
     useEffect(() => {
+        // Reset if value changes considerably or just animate from 0
+        // Ideally we animate from previous value but for now from 0 is fine
+        started.current = false;
+
         const observer = new IntersectionObserver(
             ([entry]) => {
                 if (entry.isIntersecting && !started.current) {
@@ -31,6 +73,8 @@ function AnimatedCounter({ value, suffix }) {
 
                         if (progress < 1) {
                             requestAnimationFrame(animate);
+                        } else {
+                            setCount(value); // Ensure exact final value
                         }
                     };
 
@@ -49,22 +93,6 @@ function AnimatedCounter({ value, suffix }) {
             {count.toLocaleString()}
             {suffix}
         </span>
-    );
-}
-
-export default function StatsSection() {
-    return (
-        <section style={counterStyles.section}>
-            <div style={counterStyles.grid}>
-                {stats.map((stat) => (
-                    <div key={stat.label} style={counterStyles.statCard}>
-                        <span style={counterStyles.icon}>{stat.icon}</span>
-                        <AnimatedCounter value={stat.value} suffix={stat.suffix} />
-                        <span style={counterStyles.label}>{stat.label}</span>
-                    </div>
-                ))}
-            </div>
-        </section>
     );
 }
 

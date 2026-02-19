@@ -1,7 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { uploadFile, fetchAPI } from "../../lib/api";
+import { supabase } from "../../lib/supabase";
+import { useRouter } from "next/navigation";
+
 
 const ACCEPTED_TYPES = [
     "application/pdf",
@@ -18,7 +22,27 @@ export default function UploadPage() {
     const [uploading, setUploading] = useState(false);
     const [uploadComplete, setUploadComplete] = useState(false);
     const [error, setError] = useState("");
+    const [user, setUser] = useState(null);
+    const [atsScore, setAtsScore] = useState(null);
+
+    // Preferences functionality
+    const [preferences, setPreferences] = useState({
+        internship_type: "",
+        work_mode: "Remote",
+        preferred_location: ""
+    });
+    const [savingPrefs, setSavingPrefs] = useState(false);
+
     const fileInputRef = useRef(null);
+    const router = useRouter();
+
+    useEffect(() => {
+        const getUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+        };
+        getUser();
+    }, []);
 
     const handleDrag = (e) => {
         e.preventDefault();
@@ -71,19 +95,43 @@ export default function UploadPage() {
 
     const handleUpload = async () => {
         if (!file) return;
+
+        if (!user) {
+            router.push("/login?message=Please log in to upload your resume");
+            return;
+        }
+
         setUploading(true);
         setError("");
 
-        // Simulate upload (replace with actual API call)
         try {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            const data = await uploadFile(file, user.id);
+            if (data.ats_score) setAtsScore(data.ats_score);
             setUploadComplete(true);
         } catch (err) {
+            console.error(err);
             setError("Upload failed. Please try again.");
         } finally {
             setUploading(false);
         }
     };
+
+    const handleSavePreferences = async () => {
+        if (!user) return;
+        setSavingPrefs(true);
+        try {
+            await fetchAPI(`/preferences/${user.id}`, {
+                method: 'POST',
+                body: preferences
+            });
+            router.push("/recommendations");
+        } catch (err) {
+            console.error(err);
+            setError("Failed to save preferences");
+        } finally {
+            setSavingPrefs(false);
+        }
+    }
 
     const formatFileSize = (bytes) => {
         if (bytes < 1024) return bytes + " B";
@@ -94,6 +142,7 @@ export default function UploadPage() {
     const resetUpload = () => {
         setFile(null);
         setUploadComplete(false);
+        setAtsScore(null);
         setError("");
         if (fileInputRef.current) fileInputRef.current.value = "";
     };
@@ -218,28 +267,61 @@ export default function UploadPage() {
                         )}
                     </div>
                 ) : (
-                    /* Success state */
+                    /* Success state with Preferences Form */
                     <div className="animate-fade-in-up" style={styles.successCard}>
-                        <div className="card" style={styles.successInner}>
+                        <div className="card" style={{ ...styles.successInner, maxWidth: '600px' }}>
                             <div style={styles.successIcon}>🎉</div>
                             <h2 style={styles.successTitle}>Analysis Complete!</h2>
+                            {atsScore !== null && (
+                                <div style={{
+                                    margin: '10px 0',
+                                    padding: '10px 20px',
+                                    borderRadius: '20px',
+                                    background: atsScore > 70 ? 'var(--success-light)' : 'var(--warning-light)',
+                                    color: atsScore > 70 ? 'var(--success)' : 'var(--warning)',
+                                    fontWeight: 'bold'
+                                }}>
+                                    ATS Score: {atsScore}/100
+                                </div>
+                            )}
                             <p style={styles.successDesc}>
-                                Your resume has been successfully analyzed. View your personalized
-                                internship recommendations now.
+                                Your resume has been analyzed. To get better recommendations, tell us what you are looking for.
                             </p>
+
+                            <div style={{ width: '100%', textAlign: 'left', marginTop: '20px' }}>
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Interested Role (e.g. Frontend, ML)</label>
+                                    <input
+                                        type="text"
+                                        className="input"
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'var(--surface)' }}
+                                        placeholder="Software Engineer"
+                                        value={preferences.internship_type}
+                                        onChange={(e) => setPreferences({ ...preferences, internship_type: e.target.value })}
+                                    />
+                                </div>
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Preferred Work Mode</label>
+                                    <select
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'var(--surface)' }}
+                                        value={preferences.work_mode}
+                                        onChange={(e) => setPreferences({ ...preferences, work_mode: e.target.value })}
+                                    >
+                                        <option value="Remote">Remote</option>
+                                        <option value="On-site">On-site</option>
+                                        <option value="Hybrid">Hybrid</option>
+                                    </select>
+                                </div>
+                            </div>
+
                             <div style={styles.successActions}>
-                                <Link
-                                    href="/recommendations"
+                                <button
                                     className="btn btn-primary"
                                     style={styles.uploadBtn}
+                                    onClick={handleSavePreferences}
+                                    disabled={savingPrefs}
                                 >
-                                    View Recommendations
-                                </Link>
-                                <button
-                                    className="btn btn-secondary"
-                                    onClick={resetUpload}
-                                >
-                                    Upload Another
+                                    {savingPrefs ? 'Saving...' : 'View Recommendations'}
                                 </button>
                             </div>
                         </div>
@@ -247,30 +329,32 @@ export default function UploadPage() {
                 )}
 
                 {/* Tips */}
-                <div className="animate-fade-in-up delay-400" style={styles.tipsSection}>
-                    <h3 style={styles.tipsTitle}>💡 Tips for best results</h3>
-                    <div style={styles.tipsGrid}>
-                        {[
-                            {
-                                title: "Use clear formatting",
-                                desc: "Structured resumes with clear headings are analyzed more accurately.",
-                            },
-                            {
-                                title: "Include technical skills",
-                                desc: "List your programming languages, tools, and frameworks explicitly.",
-                            },
-                            {
-                                title: "Mention projects & experience",
-                                desc: "Personal projects and internship experience improve your match quality.",
-                            },
-                        ].map((tip) => (
-                            <div key={tip.title} className="card" style={styles.tipCard}>
-                                <h4 style={styles.tipTitle}>{tip.title}</h4>
-                                <p style={styles.tipDesc}>{tip.desc}</p>
-                            </div>
-                        ))}
+                {!uploadComplete && (
+                    <div className="animate-fade-in-up delay-400" style={styles.tipsSection}>
+                        <h3 style={styles.tipsTitle}>💡 Tips for best results</h3>
+                        <div style={styles.tipsGrid}>
+                            {[
+                                {
+                                    title: "Use clear formatting",
+                                    desc: "Structured resumes with clear headings are analyzed more accurately.",
+                                },
+                                {
+                                    title: "Include technical skills",
+                                    desc: "List your programming languages, tools, and frameworks explicitly.",
+                                },
+                                {
+                                    title: "Mention projects & experience",
+                                    desc: "Personal projects and internship experience improve your match quality.",
+                                },
+                            ].map((tip) => (
+                                <div key={tip.title} className="card" style={styles.tipCard}>
+                                    <h4 style={styles.tipTitle}>{tip.title}</h4>
+                                    <p style={styles.tipDesc}>{tip.desc}</p>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );
@@ -478,3 +562,6 @@ const styles = {
         lineHeight: 1.6,
     },
 };
+
+
+

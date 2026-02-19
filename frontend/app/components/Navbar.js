@@ -1,236 +1,169 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { useTheme } from "./ThemeProvider";
+import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabase";
 
 export default function Navbar() {
-    const { theme, toggleTheme } = useTheme();
-    const [mobileOpen, setMobileOpen] = useState(false);
+    const [user, setUser] = useState(null);
+
+    useEffect(() => {
+        // Check initial user
+        const checkUser = async () => {
+            const { data } = await supabase.auth.getUser();
+            setUser(data?.user ?? null);
+        };
+        checkUser();
+
+        // Listen for auth changes
+        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+            setUser(session?.user ?? null);
+        });
+
+        return () => {
+            authListener?.subscription.unsubscribe();
+        };
+    }, []);
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        window.location.href = "/";
+    };
 
     return (
-        <nav className="glass-navbar" style={styles.navbar}>
-            <div style={styles.inner}>
-                {/* Logo */}
-                <Link href="/" style={styles.logo}>
-                    <span style={styles.logoIcon}>🔍</span>
-                    <span className="gradient-text" style={styles.logoText}>
-                        CareerLens
-                    </span>
+        <nav style={{
+            backgroundColor: '#1f2937', // Dark gray
+            color: '#fff',
+            padding: '0 2rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 10000,
+            height: '70px',
+            borderBottom: '1px solid #374151',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '40px' }}>
+                <Link href="/" style={{ fontSize: '1.5rem', fontWeight: 'bold', textDecoration: 'none', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🔍</span> CareerLens
                 </Link>
 
-                {/* Desktop Nav */}
-                <div style={styles.desktopNav}>
-                    <Link href="/" style={styles.navLink}>
-                        Home
-                    </Link>
-                    <Link href="/upload" style={styles.navLink}>
-                        Upload Resume
-                    </Link>
-                    <Link href="/recommendations" style={styles.navLink}>
-                        Recommendations
-                    </Link>
-                    <Link href="/about" style={styles.navLink}>
-                        About
-                    </Link>
-                </div>
-
-                {/* Right side */}
-                <div style={styles.rightSection}>
-                    {/* Theme toggle */}
-                    <button
-                        onClick={toggleTheme}
-                        style={styles.themeToggle}
-                        aria-label="Toggle theme"
-                        title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-                    >
-                        <span style={styles.themeIcon}>
-                            {theme === "light" ? "🌙" : "☀️"}
-                        </span>
-                    </button>
-
-                    {/* CTA */}
-                    <Link href="/upload" className="btn btn-primary" style={styles.ctaBtn}>
-                        Get Started
-                    </Link>
-
-                    {/* Mobile hamburger */}
-                    <button
-                        onClick={() => setMobileOpen(!mobileOpen)}
-                        style={styles.hamburger}
-                        aria-label="Toggle menu"
-                    >
-                        <span
-                            style={{
-                                ...styles.hamburgerLine,
-                                transform: mobileOpen
-                                    ? "rotate(45deg) translate(5px, 5px)"
-                                    : "none",
-                            }}
-                        />
-                        <span
-                            style={{
-                                ...styles.hamburgerLine,
-                                opacity: mobileOpen ? 0 : 1,
-                            }}
-                        />
-                        <span
-                            style={{
-                                ...styles.hamburgerLine,
-                                transform: mobileOpen
-                                    ? "rotate(-45deg) translate(5px, -5px)"
-                                    : "none",
-                            }}
-                        />
-                    </button>
+                {/* Navigation Links */}
+                <div style={{ display: 'flex', gap: '20px' }}>
+                    <NavLink href="/">Home</NavLink>
+                    <NavLink href="/upload">Upload Resume</NavLink>
+                    <NavLink href="/recommendations">Recommendations</NavLink>
+                    <NavLink href="/about">About</NavLink>
                 </div>
             </div>
 
-            {/* Mobile menu */}
-            {mobileOpen && (
-                <div className="glass" style={styles.mobileMenu}>
-                    <Link
-                        href="/"
-                        style={styles.mobileLink}
-                        onClick={() => setMobileOpen(false)}
-                    >
-                        Home
-                    </Link>
-                    <Link
-                        href="/upload"
-                        style={styles.mobileLink}
-                        onClick={() => setMobileOpen(false)}
-                    >
-                        Upload Resume
-                    </Link>
-                    <Link
-                        href="/recommendations"
-                        style={styles.mobileLink}
-                        onClick={() => setMobileOpen(false)}
-                    >
-                        Recommendations
-                    </Link>
-                    <Link
-                        href="/about"
-                        style={styles.mobileLink}
-                        onClick={() => setMobileOpen(false)}
-                    >
-                        About
-                    </Link>
-                </div>
-            )}
+            {/* Auth Section */}
+            <div>
+                {user ? (
+                    <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                        {/* User Info */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                background: '#3b82f6',
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 'bold',
+                                fontSize: '0.9rem'
+                            }}>
+                                {user.email?.[0].toUpperCase()}
+                            </div>
+                            <span style={{ fontSize: '0.9rem', color: '#e5e7eb', fontWeight: '500' }}>
+                                {user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0]}
+                            </span>
+                        </div>
+
+                        {/* Separator */}
+                        <div style={{ width: '1px', height: '20px', background: '#4b5563' }}></div>
+
+                        {/* Logout Button */}
+                        <button
+                            onClick={handleLogout}
+                            style={{
+                                padding: '6px 12px',
+                                cursor: 'pointer',
+                                background: 'transparent',
+                                color: '#9ca3af',
+                                border: '1px solid #4b5563',
+                                borderRadius: '4px',
+                                fontSize: '0.85rem',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = 'white'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.color = '#9ca3af'; e.currentTarget.style.borderColor = '#4b5563'; }}
+                        >
+                            Logout
+                        </button>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <Link
+                            href="/login"
+                            style={{
+                                color: '#e5e7eb',
+                                textDecoration: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                transition: 'color 0.2s',
+                                fontWeight: '500'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.color = 'white'}
+                            onMouseOut={(e) => e.currentTarget.style.color = '#e5e7eb'}
+                        >
+                            Login
+                        </Link>
+                        <Link
+                            href="/signup"
+                            style={{
+                                color: 'white',
+                                textDecoration: 'none',
+                                fontWeight: '600',
+                                backgroundColor: '#2563eb', // Blue-600
+                                padding: '8px 20px',
+                                borderRadius: '6px',
+                                transition: 'background-color 0.2s'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'} // Blue-700
+                            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                        >
+                            Get Started
+                        </Link>
+                    </div>
+                )}
+            </div>
         </nav>
     );
 }
 
-const styles = {
-    navbar: {
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 1000,
-        padding: "0 24px",
-    },
-    inner: {
-        maxWidth: "1200px",
-        margin: "0 auto",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        height: "72px",
-    },
-    logo: {
-        display: "flex",
-        alignItems: "center",
-        gap: "10px",
-        textDecoration: "none",
-        flexShrink: 0,
-    },
-    logoIcon: {
-        fontSize: "1.6rem",
-    },
-    logoText: {
-        fontSize: "1.35rem",
-        fontWeight: 800,
-        letterSpacing: "-0.02em",
-    },
-    desktopNav: {
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-    },
-    navLink: {
-        padding: "8px 16px",
-        borderRadius: "var(--radius-full)",
-        color: "var(--foreground-secondary)",
-        textDecoration: "none",
-        fontSize: "0.9rem",
-        fontWeight: 500,
-        transition: "all var(--transition-fast)",
-    },
-    rightSection: {
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-    },
-    themeToggle: {
-        width: "40px",
-        height: "40px",
-        borderRadius: "var(--radius-full)",
-        border: "1px solid var(--surface-border)",
-        background: "var(--surface)",
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        transition: "all var(--transition-fast)",
-    },
-    themeIcon: {
-        fontSize: "1.1rem",
-        lineHeight: 1,
-    },
-    ctaBtn: {
-        padding: "8px 20px",
-        fontSize: "0.85rem",
-    },
-    hamburger: {
-        display: "none",
-        flexDirection: "column",
-        gap: "5px",
-        padding: "8px",
-        background: "none",
-        border: "none",
-        cursor: "pointer",
-    },
-    hamburgerLine: {
-        width: "22px",
-        height: "2px",
-        background: "var(--foreground)",
-        borderRadius: "2px",
-        transition: "all var(--transition-fast)",
-    },
-    mobileMenu: {
-        position: "absolute",
-        top: "72px",
-        left: "16px",
-        right: "16px",
-        padding: "16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "4px",
-        boxShadow: "var(--card-shadow)",
-    },
-    mobileLink: {
-        padding: "12px 16px",
-        borderRadius: "var(--radius-md)",
-        color: "var(--foreground)",
-        textDecoration: "none",
-        fontSize: "0.95rem",
-        fontWeight: 500,
-        transition: "background var(--transition-fast)",
-    },
-};
-
-// Add responsive styles via CSS-in-JS media query handling in globals.css
-// We'll add a @media block to handle hiding desktop nav on mobile
+// Helper component for Nav Links
+function NavLink({ href, children }) {
+    return (
+        <Link
+            href={href}
+            style={{
+                color: '#d1d5db',
+                textDecoration: 'none',
+                fontSize: '0.95rem',
+                fontWeight: '500',
+                transition: 'color 0.2s'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.color = 'white'}
+            onMouseOut={(e) => e.currentTarget.style.color = '#d1d5db'}
+        >
+            {children}
+        </Link>
+    );
+}

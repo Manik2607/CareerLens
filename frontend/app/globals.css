@@ -454,14 +454,6 @@ body {
   }
 }
 
-@media (min-width: 769px) {
-
-  /* Hide mobile menu on desktop */
-  nav>div:last-child {
-    display: none !important;
-  }
-}
-
 /* ── Responsive: Grids ── */
 @media (max-width: 640px) {
   .upload-zone {

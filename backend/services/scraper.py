@@ -1,75 +1,92 @@
 import httpx
 from bs4 import BeautifulSoup
 from typing import List, Dict
-import asyncio
+import logging
+
+logger = logging.getLogger("scraper")
+logger.setLevel(logging.DEBUG)
+
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    ch.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+    logger.addHandler(ch)
+
 
 class InternshalaScraper:
     BASE_URL = "https://internshala.com/internships"
-    
+
     @staticmethod
     async def scrape_internships(category: str = "") -> List[Dict]:
-        # Internshala URL structure: /<category>-internships
+        """Scrape internships from Internshala for a given category."""
         url = InternshalaScraper.BASE_URL
         if category:
-            # simplistic mapping, might need more robust slugification
             slug = category.lower().replace(" ", "-")
             url = f"{InternshalaScraper.BASE_URL}/{slug}-internships"
-            
+
+        logger.info(f"Scraping: {url}")
+
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        
+
         internships = []
-        
+
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(url, headers=headers, follow_redirects=True)
-                
+
             if response.status_code != 200:
-                print(f"Failed to fetch Internshala: {response.status_code}")
+                logger.error(f"Failed to fetch Internshala: {response.status_code}")
                 return []
-                
+
             soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # This selector is based on Internshala's structure (might change)
             listings = soup.find_all('div', class_='individual_internship')
-            
+            logger.info(f"Found {len(listings)} listing containers")
+
             for listing in listings:
                 try:
-                    # Skip if it's just a promotional container
-                    if 'marketing_contain' in listing.get('class', []):
-                         continue
+                    # Company name
+                    company_elem = listing.find('p', class_='company-name')
+                    company = company_elem.get_text(strip=True) if company_elem else "Unknown"
 
-                    # Extract ID to avoid duplicates if possible, or just use as is
-                    id_attr = listing.get('internshipid')
-                    
-                    company_elem = listing.find('a', class_='link_display_like_text')
-                    company = company_elem.text.strip() if company_elem else "Unknown Company"
-                    
-                    role_elem = listing.find('h3', class_='job-title-heading')
-                    role = role_elem.text.strip() if role_elem else "Unknown Role"
-                    
-                    location_elem = listing.find('a', class_='location_link')
-                    location = location_elem.text.strip() if location_elem else "Unknown Location"
-                    
-                    # Work type (remote/in-office) often in location or separate label
+                    # Role / title
+                    role_elem = listing.find('h3', class_='job-internship-name')
+                    role = role_elem.get_text(strip=True) if role_elem else "Unknown"
+
+                    # Location
+                    location_elem = listing.find('div', class_='locations')
+                    location = location_elem.get_text(strip=True) if location_elem else "Unknown"
+
+                    # Work type
                     work_type = "In-office"
-                    if "Remote" in location:
+                    if "work from home" in location.lower() or "remote" in location.lower():
                         work_type = "Remote"
-                    # Also check status tags
-                    status_tags = listing.select('.status-small')
+                        location = "Remote"
+                    # Check for "Work From Home" tag
+                    status_tags = listing.find_all(class_='status-success')
                     for tag in status_tags:
-                        if 'Remote' in tag.text:
+                        tag_text = tag.get_text(strip=True).lower()
+                        if 'work from home' in tag_text or 'remote' in tag_text:
                             work_type = "Remote"
 
-                    
-                    # stipend
+                    # Stipend
                     stipend_elem = listing.find('span', class_='stipend')
-                    salary = stipend_elem.text.strip() if stipend_elem else "Unpaid"
-                    
+                    salary = stipend_elem.get_text(strip=True) if stipend_elem else "Unpaid"
+
+                    # Skills
+                    skill_elems = listing.find_all('div', class_='job_skill')
+                    skills = [s.get_text(strip=True).lower() for s in skill_elems]
+
                     # Apply link
-                    link_elem = listing.find('a', class_='view_detail_button')
-                    apply_url = "https://internshala.com" + link_elem['href'] if link_elem else ""
+                    link_elem = listing.find('a', class_='job-title-href')
+                    apply_url = ""
+                    if link_elem and link_elem.get('href'):
+                        apply_url = "https://internshala.com" + link_elem['href']
+
+                    # Skip if no valid role or company
+                    if company == "Unknown" and role == "Unknown":
+                        continue
 
                     internships.append({
                         "company": company,
@@ -79,14 +96,15 @@ class InternshalaScraper:
                         "salary": salary,
                         "apply_url": apply_url,
                         "source": "internshala",
-                        "skills": [], # Parsing skills from listing requires visiting detail page often
-                        "posted_at": None 
+                        "skills": skills,
+                        "posted_at": None
                     })
                 except Exception as e:
-                    print(f"Error parsing listing: {e}")
+                    logger.warning(f"Error parsing listing: {e}")
                     continue
-                    
+
         except Exception as e:
-            print(f"Scraping error: {e}")
-            
+            logger.error(f"Scraping error: {e}")
+
+        logger.info(f"Successfully scraped {len(internships)} internships")
         return internships

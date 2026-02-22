@@ -1,71 +1,133 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Form
-from typing import Optional
+from fastapi import APIRouter, File, UploadFile, HTTPException, Form
 from supabase_client import supabase
 from services.resume_parser import ResumeParser
 from services.ats_scorer import ATSScorer
-from models.schemas import ResumeResponse
-import io
 import uuid
+import traceback
+import logging
+
+# Configure logging
+logger = logging.getLogger("resume_router")
+logger.setLevel(logging.DEBUG)
+
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    ch.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+    logger.addHandler(ch)
 
 router = APIRouter(prefix="/api/resume", tags=["Resume"])
 
-@router.post("/upload", response_model=ResumeResponse)
+
+@router.post("/upload")
 async def upload_resume(
     file: UploadFile = File(...),
-    user_id: str = Form(...) # In real app, get from auth token
+    user_id: str = Form(...)
 ):
+    """
+    Upload a resume file, parse it, score it, and store results in Supabase DB.
+    File storage is skipped — only extracted data is saved.
+    """
+    logger.info("=" * 60)
+    logger.info("RESUME UPLOAD STARTED")
+    logger.info(f"User ID: {user_id}")
+    logger.info(f"File: {file.filename} ({file.content_type})")
+    logger.info("=" * 60)
+
     try:
+        # Validate file
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="No filename provided")
+
+        file_ext = file.filename.split(".")[-1].lower()
+        if file_ext not in ["pdf", "docx", "doc", "txt"]:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: .{file_ext}")
+
+        # Step 1: Read file
+        logger.info("[Step 1] Reading file...")
         content = await file.read()
-        
-        # 1. Upload to Supabase Storage
-        file_ext = file.filename.split(".")[-1]
-        file_path = f"{user_id}/{uuid.uuid4()}.{file_ext}"
-        
-        # Ensure bucket exists (or assume it does 'resumes')
-        # supabase.storage.create_bucket("resumes") # Admin only
-        
-        public_url = ""
+        logger.info(f"[Step 1] ✅ Read {len(content)} bytes")
+
+        if len(content) == 0:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+        # Step 2: Extract text
+        logger.info("[Step 2] Extracting text...")
         try:
-            supabase.storage.from_("resumes").upload(file_path, content)
-            # Get public URL
-            public_url = supabase.storage.from_("resumes").get_public_url(file_path)
+            text = ResumeParser.extract_text(content, file.filename)
+            logger.info(f"[Step 2] ✅ Extracted {len(text)} chars")
         except Exception as e:
-            # If upload fails, maybe bucket missing or permissions
-            print(f"Storage upload error: {e}")
-            # We can still proceed with text extraction and DB save even if storage fails
-        
-        # 2. Extract Text
-        text = ResumeParser.extract_text(content, file.filename)
-        skills = ResumeParser.extract_skills(text)
-        
-        # 3. Calculate ATS Score
-        score = ATSScorer.calculate_score(text, skills)
-        
-        # 4. Save to Database
+            logger.error(f"[Step 2] ❌ Text extraction failed: {e}")
+            text = ""
+
+        # Step 3: Extract skills
+        logger.info("[Step 3] Extracting skills...")
+        try:
+            skills = ResumeParser.extract_skills(text)
+            logger.info(f"[Step 3] ✅ Skills: {skills}")
+        except Exception as e:
+            logger.error(f"[Step 3] ❌ Skill extraction failed: {e}")
+            skills = []
+
+        # Step 4: Calculate ATS score
+        logger.info("[Step 4] Calculating ATS score...")
+        try:
+            score = ATSScorer.calculate_score(
+                resume_text=text,
+                resume_skills=skills,
+                job_description=""
+            )
+            logger.info(f"[Step 4] ✅ ATS Score: {score}")
+        except Exception as e:
+            logger.error(f"[Step 4] ❌ Scoring failed: {e}")
+            score = 0
+
+        # Step 5: Save to Supabase DB (no file storage, just data)
+        logger.info("[Step 5] Saving to database...")
         data = {
             "user_id": user_id,
             "file_name": file.filename,
-            "file_url": public_url,
+            "file_url": "",
             "extracted_text": text,
             "skills": skills,
             "ats_score": score
         }
-        
-        response = supabase.table("resumes").insert(data).execute()
-        
+
+        try:
+            response = supabase.table("resumes").insert(data).execute()
+            logger.info(f"[Step 5] ✅ Saved! Row: {response.data}")
+        except Exception as db_err:
+            logger.error(f"[Step 5] ❌ DB insert failed: {db_err}")
+            logger.error(traceback.format_exc())
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to save resume: {str(db_err)}"
+            )
+
         if not response.data:
-            raise HTTPException(status_code=500, detail="Failed to save resume data")
-            
-        return response.data[0]
-        
+            logger.error("[Step 5] ❌ DB returned empty data (RLS issue?)")
+            raise HTTPException(status_code=500, detail="Database returned no data")
+
+        result = response.data[0]
+        logger.info(f"✅ UPLOAD COMPLETE — ID: {result.get('id')}, Score: {score}")
+        return result
+
+    except HTTPException:
+        raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"CRITICAL ERROR in upload_resume: {e}")
-        # Return internal server error but with safe message
+        logger.error(f"❌ UNHANDLED ERROR: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-@router.get("/list/{user_id}", response_model=list[ResumeResponse])
+
+@router.get("/list/{user_id}")
 async def list_resumes(user_id: str):
-    response = supabase.table("resumes").select("*").eq("user_id", user_id).execute()
-    return response.data
+    """List all resumes for a given user."""
+    logger.info(f"Listing resumes for user: {user_id}")
+    try:
+        response = supabase.table("resumes").select("*").eq("user_id", user_id).execute()
+        logger.info(f"Found {len(response.data)} resumes")
+        return response.data
+    except Exception as e:
+        logger.error(f"Error listing resumes: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list resumes: {str(e)}")

@@ -57,6 +57,7 @@ export default function Navbar() {
                     <NavLink href="/">Home</NavLink>
                     <NavLink href="/upload">Upload Resume</NavLink>
                     <NavLink href="/recommendations">Recommendations</NavLink>
+                    <NavLink href="/profile">Profile</NavLink>
                     <NavLink href="/about">About</NavLink>
                 </div>
             </div>

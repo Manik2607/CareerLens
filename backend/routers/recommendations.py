@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from supabase_client import supabase
 from services.matcher import Matcher
+from typing import Optional
 import logging
 import traceback
 
@@ -17,8 +18,19 @@ router = APIRouter(prefix="/api/recommendations", tags=["Recommendations"])
 
 
 @router.get("/{user_id}")
-async def get_recommendations(user_id: str):
-    logger.info(f"Getting recommendations for user: {user_id}")
+async def get_recommendations(
+    user_id: str,
+    work_type: Optional[str] = Query(None, description="Filter: Remote, On-site, Hybrid"),
+    location: Optional[str] = Query(None, description="Substring match on location"),
+    search: Optional[str] = Query(None, description="Keyword search on role/company/description"),
+    min_score: int = Query(0, ge=0, le=100, description="Minimum match score"),
+    skills_filter: Optional[str] = Query(None, alias="skills", description="Comma-separated skills to filter by"),
+    sort: str = Query("match", description="Sort: match, recent, salary"),
+    limit: int = Query(50, ge=1, le=100, description="Max results"),
+):
+    logger.info(f"Getting recommendations for user: {user_id} "
+                f"(work_type={work_type}, location={location}, search={search}, "
+                f"min_score={min_score}, sort={sort}, limit={limit})")
 
     try:
         # 1. Get latest resume
@@ -43,23 +55,59 @@ async def get_recommendations(user_id: str):
             preferred_work_mode = (prefs.data[0].get("work_mode") or "").lower()
             logger.info(f"Preferences — type: '{preferred_type}', work_mode: '{preferred_work_mode}'")
 
-        # 3. Fetch ALL internships (no filter — we rank them instead)
-        internships = supabase.table("internships").select("*").limit(200).execute()
-        logger.info(f"Total internships to match: {len(internships.data)}")
+        # 3. Fetch internships — apply server-side filters where possible
+        query = supabase.table("internships").select("*")
 
-        if not internships.data:
-            logger.warning("No internships in database!")
+        if work_type and work_type.lower() != "all":
+            query = query.ilike("work_type", f"%{work_type}%")
+
+        if location:
+            query = query.ilike("location", f"%{location}%")
+
+        internships_resp = query.limit(300).execute()
+        all_internships = internships_resp.data or []
+        logger.info(f"Internships after DB filters: {len(all_internships)}")
+
+        if not all_internships:
+            logger.warning("No internships match the filters!")
             return []
 
-        # 4. Calculate match scores
+        # 4. Parse skills filter
+        filter_skills_set = set()
+        if skills_filter:
+            filter_skills_set = set(s.strip().lower() for s in skills_filter.split(",") if s.strip())
+
+        # 5. Keyword search filter
+        search_lower = search.strip().lower() if search else ""
+
+        # 6. Calculate match scores & apply remaining filters
         matches = []
-        for internship in internships.data:
+        for internship in all_internships:
             internship_skills = internship.get("skills", []) or []
             internship_text = " ".join([
                 internship.get("description") or "",
                 internship.get("role") or "",
                 internship.get("company") or ""
             ])
+
+            # -- Keyword search --
+            if search_lower:
+                role_l = (internship.get("role") or "").lower()
+                company_l = (internship.get("company") or "").lower()
+                desc_l = (internship.get("description") or "").lower()
+                if (search_lower not in role_l
+                        and search_lower not in company_l
+                        and search_lower not in desc_l):
+                    continue
+
+            # -- Skills filter --
+            if filter_skills_set:
+                intern_skills_lower = set(s.lower() for s in internship_skills)
+                if not filter_skills_set.intersection(intern_skills_lower):
+                    # Also check description text for skill mentions
+                    text_lower = internship_text.lower()
+                    if not any(sk in text_lower for sk in filter_skills_set):
+                        continue
 
             # Base skill match score (0-100)
             score = Matcher.calculate_match(resume_skills, internship_skills, internship_text)
@@ -75,6 +123,10 @@ async def get_recommendations(user_id: str):
             if preferred_work_mode and preferred_work_mode in work_type_lower:
                 score = min(score + 5, 100)
 
+            # -- Min score filter --
+            if score < min_score:
+                continue
+
             # Find explicitly matched skills
             resume_set = set(s.lower() for s in resume_skills)
             intern_set = set(s.lower() for s in internship_skills)
@@ -85,18 +137,27 @@ async def get_recommendations(user_id: str):
                 if skill in internship_text.lower() and skill not in matched_skills:
                     matched_skills.append(skill)
 
-            if score > 0:
-                matches.append({
-                    "internship": internship,
-                    "match_score": score,
-                    "matched_skills": matched_skills
-                })
+            matches.append({
+                "internship": internship,
+                "match_score": score,
+                "matched_skills": matched_skills
+            })
 
-        # Sort by score descending
-        matches.sort(key=lambda x: x["match_score"], reverse=True)
+        # 7. Sort
+        if sort == "recent":
+            matches.sort(key=lambda x: x["internship"].get("posted_at") or "", reverse=True)
+        elif sort == "salary":
+            def salary_key(m):
+                sal = m["internship"].get("salary") or ""
+                # Extract first number from salary string for rough comparison
+                nums = "".join(c if c.isdigit() else " " for c in sal).split()
+                return int(nums[0]) if nums else 0
+            matches.sort(key=salary_key, reverse=True)
+        else:
+            matches.sort(key=lambda x: x["match_score"], reverse=True)
 
-        # Return top 20
-        result = matches[:20]
+        # 8. Limit
+        result = matches[:limit]
         logger.info(f"✅ Returning {len(result)} recommendations (top scores: {[m['match_score'] for m in result[:5]]})")
         return result
 

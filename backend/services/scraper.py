@@ -1,6 +1,6 @@
 import httpx
 from bs4 import BeautifulSoup
-from typing import List, Dict
+from typing import List, Dict, Optional
 import logging
 
 logger = logging.getLogger("scraper")
@@ -17,12 +17,37 @@ class InternshalaScraper:
     BASE_URL = "https://internshala.com/internships"
 
     @staticmethod
-    async def scrape_internships(category: str = "") -> List[Dict]:
-        """Scrape internships from Internshala for a given category."""
-        url = InternshalaScraper.BASE_URL
+    async def scrape_internships(
+        category: str = "",
+        work_type: Optional[str] = None,
+        location: Optional[str] = None,
+    ) -> List[Dict]:
+        """Scrape internships from Internshala for a given category.
+
+        Args:
+            category: e.g. "python", "web development"
+            work_type: "remote" or "work from home" → prepends 'work-from-home-' to slug
+            location: city name → appends '/in-<city>' to URL
+        """
+        # Build the URL slug
+        slug_parts = []
+
+        # Work-from-home prefix
+        if work_type and work_type.lower() in ("remote", "work from home"):
+            slug_parts.append("work-from-home")
+
+        # Category
         if category:
-            slug = category.lower().replace(" ", "-")
-            url = f"{InternshalaScraper.BASE_URL}/{slug}-internships"
+            slug_parts.append(category.lower().replace(" ", "-"))
+
+        slug_parts.append("internships")
+        slug = "-".join(slug_parts)
+        url = f"{InternshalaScraper.BASE_URL}/{slug}"
+
+        # Location suffix
+        if location and location.strip():
+            loc_slug = location.strip().lower().replace(" ", "-")
+            url = f"{url}/in-{loc_slug}"
 
         logger.info(f"Scraping: {url}")
 
@@ -56,23 +81,27 @@ class InternshalaScraper:
 
                     # Location
                     location_elem = listing.find('div', class_='locations')
-                    location = location_elem.get_text(strip=True) if location_elem else "Unknown"
+                    loc = location_elem.get_text(strip=True) if location_elem else "Unknown"
 
                     # Work type
-                    work_type = "In-office"
-                    if "work from home" in location.lower() or "remote" in location.lower():
-                        work_type = "Remote"
-                        location = "Remote"
+                    intern_work_type = "In-office"
+                    if "work from home" in loc.lower() or "remote" in loc.lower():
+                        intern_work_type = "Remote"
+                        loc = "Remote"
                     # Check for "Work From Home" tag
                     status_tags = listing.find_all(class_='status-success')
                     for tag in status_tags:
                         tag_text = tag.get_text(strip=True).lower()
                         if 'work from home' in tag_text or 'remote' in tag_text:
-                            work_type = "Remote"
+                            intern_work_type = "Remote"
 
                     # Stipend
                     stipend_elem = listing.find('span', class_='stipend')
                     salary = stipend_elem.get_text(strip=True) if stipend_elem else "Unpaid"
+
+                    # Duration
+                    duration_elem = listing.find('div', class_='item_body')
+                    duration = duration_elem.get_text(strip=True) if duration_elem else ""
 
                     # Skills
                     skill_elems = listing.find_all('div', class_='job_skill')
@@ -91,8 +120,8 @@ class InternshalaScraper:
                     internships.append({
                         "company": company,
                         "role": role,
-                        "location": location,
-                        "work_type": work_type,
+                        "location": loc,
+                        "work_type": intern_work_type,
                         "salary": salary,
                         "apply_url": apply_url,
                         "source": "internshala",

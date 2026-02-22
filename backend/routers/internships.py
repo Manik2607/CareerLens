@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from services.scraper import InternshalaScraper
+from models.schemas import ScrapeRequest
 from supabase_client import supabase
 import datetime
 import logging
@@ -33,14 +34,22 @@ async def get_internships(work_type: str = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-async def scrape_and_save(categories: list[str]):
+async def scrape_and_save(
+    categories: list[str],
+    work_type: str = None,
+    location: str = None,
+):
     """Background task: scrape internships from Internshala and save to DB."""
     total_saved = 0
 
     for category in categories:
-        logger.info(f"Scraping category: {category}")
+        logger.info(f"Scraping category: {category} (work_type={work_type}, location={location})")
         try:
-            internships = await InternshalaScraper.scrape_internships(category)
+            internships = await InternshalaScraper.scrape_internships(
+                category,
+                work_type=work_type,
+                location=location,
+            )
             logger.info(f"Found {len(internships)} internships for '{category}'")
 
             for item in internships:
@@ -70,23 +79,36 @@ async def scrape_and_save(categories: list[str]):
 
 
 @router.post("/scrape")
-async def trigger_scrape(background_tasks: BackgroundTasks, category: str = ""):
-    """Manually trigger scraping. If no category, scrapes multiple defaults."""
-    if category:
-        categories = [category]
-    else:
-        categories = [
-            "web development",
-            "python",
-            "machine learning",
-            "data science",
-            "frontend development",
-            "backend development",
-            "mobile app development",
-        ]
+async def trigger_scrape(
+    background_tasks: BackgroundTasks,
+    body: ScrapeRequest = ScrapeRequest(),
+):
+    """Trigger scraping with optional filters.
 
-    background_tasks.add_task(scrape_and_save, categories)
+    Body JSON:
+      - categories: list of category strings (default: popular categories)
+      - work_type: "remote" to filter for WFH internships on Internshala
+      - location: city name to scope results (e.g. "bangalore")
+    """
+    categories = body.categories if body.categories else [
+        "web development",
+        "python",
+        "machine learning",
+        "data science",
+        "frontend development",
+        "backend development",
+        "mobile app development",
+    ]
+
+    background_tasks.add_task(
+        scrape_and_save,
+        categories,
+        work_type=body.work_type,
+        location=body.location,
+    )
     return {
         "message": f"Scraping started for categories: {categories}",
-        "categories": categories
+        "categories": categories,
+        "work_type": body.work_type,
+        "location": body.location,
     }

@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from models.schemas import PreferencesRequest
 from supabase_client import supabase
+from routers.internships import scrape_and_save
 import logging
 import traceback
 
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/api/preferences", tags=["Preferences"])
 
 
 @router.post("/{user_id}")
-async def set_preferences(user_id: str, prefs: PreferencesRequest):
+async def set_preferences(user_id: str, prefs: PreferencesRequest, background_tasks: BackgroundTasks):
     logger.info(f"Setting preferences for user: {user_id}")
     logger.info(f"Preferences: {prefs.dict()}")
 
@@ -39,6 +40,13 @@ async def set_preferences(user_id: str, prefs: PreferencesRequest):
             raise HTTPException(status_code=500, detail="Failed to save preferences")
 
         logger.info(f"✅ Preferences saved: {response.data[0]}")
+
+        # If target_roles changed, trigger background scrape
+        target_roles = prefs.target_roles or []
+        if target_roles:
+            logger.info(f"📡 Triggering scrape for target roles: {target_roles}")
+            background_tasks.add_task(scrape_and_save, target_roles)
+
         return response.data[0]
 
     except HTTPException:
@@ -62,6 +70,7 @@ async def get_preferences(user_id: str):
                 "internship_type": "",
                 "work_mode": "Remote",
                 "preferred_location": "",
+                "target_roles": [],
                 "updated_at": None
             }
         return response.data[0]

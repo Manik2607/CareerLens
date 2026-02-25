@@ -103,14 +103,17 @@ export default function UploadPage() {
 
         setUploading(true);
         setError("");
+        console.log('[UploadPage] Starting upload for user:', user.id);
 
         try {
             const data = await uploadFile(file, user.id);
+            console.log('[UploadPage] Upload response data:', data);
             if (data.ats_score) setAtsScore(data.ats_score);
             setUploadComplete(true);
         } catch (err) {
-            console.error(err);
-            setError("Upload failed. Please try again.");
+            console.error('[UploadPage] Upload error:', err);
+            const errMsg = err.message || "Upload failed. Please try again.";
+            setError(errMsg);
         } finally {
             setUploading(false);
         }

@@ -57,12 +57,13 @@ export default function Navbar() {
                     <NavLink href="/">Home</NavLink>
                     <NavLink href="/upload">Upload Resume</NavLink>
                     <NavLink href="/recommendations">Recommendations</NavLink>
+                    <NavLink href="/profile">Profile</NavLink>
                     <NavLink href="/about">About</NavLink>
                 </div>
             </div>
 
             {/* Auth Section */}
-            <div>
+            <div style={{ flexShrink: 0 }}>
                 {user ? (
                     <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                         {/* User Info */}
@@ -79,7 +80,7 @@ export default function Navbar() {
                                 fontWeight: 'bold',
                                 fontSize: '0.9rem'
                             }}>
-                                {user.email?.[0].toUpperCase()}
+                                {user.email?.[0]?.toUpperCase()}
                             </div>
                             <span style={{ fontSize: '0.9rem', color: '#e5e7eb', fontWeight: '500' }}>
                                 {user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0]}

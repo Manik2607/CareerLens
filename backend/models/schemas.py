@@ -33,6 +33,17 @@ class PreferencesRequest(BaseModel):
     internship_type: Optional[str] = None
     work_mode: Optional[str] = None
     preferred_location: Optional[str] = None
+    target_roles: List[str] = []
+
+# Scrape Request
+class ScrapeRequest(BaseModel):
+    categories: List[str] = []
+    work_type: Optional[str] = None
+    location: Optional[str] = None
+
+# Skills Update
+class SkillsUpdateRequest(BaseModel):
+    skills: List[str]
 
 class PreferencesResponse(PreferencesRequest):
     id: UUID

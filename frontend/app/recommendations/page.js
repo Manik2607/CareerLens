@@ -14,14 +14,14 @@ const SORT_OPTIONS = [
 ];
 
 const ROLE_CATEGORIES = [
-    { key: "web development", label: "Web Development", icon: "🌐" },
-    { key: "python", label: "Python", icon: "🐍" },
-    { key: "machine learning", label: "Machine Learning", icon: "🤖" },
-    { key: "data science", label: "Data Science", icon: "📊" },
-    { key: "frontend development", label: "Frontend", icon: "🎨" },
-    { key: "backend development", label: "Backend", icon: "⚙️" },
-    { key: "mobile app development", label: "Mobile Dev", icon: "📱" },
-    { key: "devops", label: "DevOps", icon: "🔧" },
+    { key: "web development", label: "Web Development" },
+    { key: "python", label: "Python" },
+    { key: "machine learning", label: "Machine Learning" },
+    { key: "data science", label: "Data Science" },
+    { key: "frontend development", label: "Frontend" },
+    { key: "backend development", label: "Backend" },
+    { key: "mobile app development", label: "Mobile Dev" },
+    { key: "devops", label: "DevOps" },
 ];
 
 function getMatchColor(match) {
@@ -212,13 +212,13 @@ export default function RecommendationsPage() {
                 method: "POST",
                 body,
             });
-            setScrapeMessage(`📡 Scraping started for: ${(res.categories || []).join(", ")}`);
+            setScrapeMessage(`Scraping started for: ${(res.categories || []).join(", ")}`);
             // Re-fetch after a delay to show new results
             setTimeout(() => {
                 if (user) fetchRecommendations(user.id);
             }, 8000);
         } catch (err) {
-            setScrapeMessage("❌ Failed to start scraping.");
+            setScrapeMessage("Failed to start scraping.");
         } finally {
             setTimeout(() => setScraping(false), 3000);
         }
@@ -257,7 +257,7 @@ export default function RecommendationsPage() {
             <div style={styles.container}>
                 {/* ── Header ── */}
                 <div className="animate-fade-in" style={styles.header}>
-                    <span style={styles.badge}>🎯 Recommendations</span>
+                    <span className="section-label">Recommendations</span>
                     <h1 style={styles.title}>
                         Your personalized <span className="gradient-text">matches</span>
                     </h1>
@@ -270,7 +270,7 @@ export default function RecommendationsPage() {
                 {/* ── Search Bar ── */}
                 <div className="animate-fade-in delay-100" style={styles.searchContainer}>
                     <div style={styles.searchWrapper}>
-                        <span style={styles.searchIcon}>🔍</span>
+                        <span style={styles.searchIcon}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>
                         <input
                             type="text"
                             value={searchQuery}
@@ -334,7 +334,7 @@ export default function RecommendationsPage() {
                                     : "var(--surface-border)",
                             }}
                         >
-                            ⚙ Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
+                            Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
                         </button>
                     </div>
 
@@ -355,7 +355,7 @@ export default function RecommendationsPage() {
                 {showFilters && (
                     <div className="card animate-fade-in" style={styles.filtersPanel}>
                         <div style={styles.filtersPanelHeader}>
-                            <h3 style={styles.filtersPanelTitle}>🔧 Advanced Filters</h3>
+                            <h3 style={styles.filtersPanelTitle}>Advanced Filters</h3>
                             <button
                                 onClick={clearFilters}
                                 style={styles.clearAllBtn}
@@ -367,7 +367,7 @@ export default function RecommendationsPage() {
                         <div style={styles.filtersGrid}>
                             {/* Location */}
                             <div style={styles.filterField}>
-                                <label style={styles.filterLabel}>📍 Location</label>
+                                <label style={styles.filterLabel}>Location</label>
                                 <input
                                     type="text"
                                     value={locationFilter}
@@ -380,7 +380,7 @@ export default function RecommendationsPage() {
                             {/* Min Match Score */}
                             <div style={styles.filterField}>
                                 <label style={styles.filterLabel}>
-                                    📊 Min Match Score: <strong>{minScore}%</strong>
+                                    Min Match Score: <strong>{minScore}%</strong>
                                 </label>
                                 <input
                                     type="range"
@@ -402,7 +402,7 @@ export default function RecommendationsPage() {
                         {/* Skills Filter */}
                         {userSkills.length > 0 && (
                             <div style={{ marginTop: "16px" }}>
-                                <label style={styles.filterLabel}>🛠 Filter by Skills</label>
+                                <label style={styles.filterLabel}>Filter by Skills</label>
                                 <div style={styles.skillsFilterGrid}>
                                     {userSkills.map((skill) => {
                                         const active = selectedSkills.includes(skill);
@@ -434,14 +434,14 @@ export default function RecommendationsPage() {
                         className="btn btn-secondary"
                         style={{ fontSize: "0.88rem", padding: "10px 20px" }}
                     >
-                        {showScrapePanel ? "▲ Hide Scrape Options" : "📡 Fetch New Internships"}
+                        {showScrapePanel ? "Hide Scrape Options" : "Fetch New Internships"}
                     </button>
                 </div>
 
                 {/* ── Scrape Panel ── */}
                 {showScrapePanel && (
                     <div className="card animate-fade-in" style={styles.scrapePanel}>
-                        <h3 style={styles.scrapePanelTitle}>📡 Scrape New Internships</h3>
+                        <h3 style={styles.scrapePanelTitle}>Scrape New Internships</h3>
                         <p style={styles.scrapePanelDesc}>
                             Select categories and filters to scrape fresh internships from Internshala.
                         </p>
@@ -449,7 +449,7 @@ export default function RecommendationsPage() {
                         {/* Category pills */}
                         <label style={styles.filterLabel}>Categories</label>
                         <div style={styles.scrapeCategoriesGrid}>
-                            {ROLE_CATEGORIES.map(({ key, label, icon }) => {
+                            {ROLE_CATEGORIES.map(({ key, label }) => {
                                 const active = scrapeCategories.includes(key);
                                 return (
                                     <button
@@ -462,7 +462,7 @@ export default function RecommendationsPage() {
                                             color: active ? "var(--primary)" : "var(--foreground-secondary)",
                                         }}
                                     >
-                                        <span>{icon}</span> {label}
+                                        {label}
                                         {active && <span style={{ fontWeight: 700 }}>✓</span>}
                                     </button>
                                 );
@@ -502,7 +502,7 @@ export default function RecommendationsPage() {
                                 disabled={scraping}
                                 style={{ padding: "10px 28px", fontSize: "0.9rem" }}
                             >
-                                {scraping ? "⏳ Scraping..." : "🚀 Start Scraping"}
+                                {scraping ? "Scraping..." : "Start Scraping"}
                             </button>
                             {scrapeCategories.length === 0 && (
                                 <span style={{ fontSize: "0.82rem", color: "var(--foreground-muted)" }}>
@@ -571,7 +571,7 @@ export default function RecommendationsPage() {
                                     <p style={styles.recDesc}>{rec.description}</p>
 
                                     <div style={styles.metaRow}>
-                                        <span style={styles.metaItem}>📍 {rec.location}</span>
+                                        <span style={styles.metaItem}>{rec.location}</span>
                                         <span
                                             style={{
                                                 ...styles.typeBadge,
@@ -581,8 +581,8 @@ export default function RecommendationsPage() {
                                         >
                                             {rec.type}
                                         </span>
-                                        <span style={styles.metaItem}>💰 {rec.salary}</span>
-                                        <span style={styles.metaItem}>🕐 {rec.posted}</span>
+                                        <span style={styles.metaItem}>{rec.salary}</span>
+                                        <span style={styles.metaItem}>{rec.posted}</span>
                                     </div>
 
                                     {/* Skills with matched highlighting */}
@@ -615,7 +615,7 @@ export default function RecommendationsPage() {
                                             Apply Now
                                         </a>
                                         <button className="btn btn-ghost" style={styles.saveBtn}>
-                                            ♡ Save
+                                            Save
                                         </button>
                                     </div>
                                 </div>
@@ -627,7 +627,7 @@ export default function RecommendationsPage() {
                 {/* ── Empty state ── */}
                 {!loading && filtered.length === 0 && (
                     <div style={styles.emptyState}>
-                        <span style={{ fontSize: "3rem" }}>🔍</span>
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--foreground-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                         <h3 style={styles.emptyTitle}>No matches found</h3>
                         <p style={styles.emptyDesc}>
                             Try adjusting your filters or{" "}

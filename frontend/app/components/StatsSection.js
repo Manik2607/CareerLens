@@ -4,10 +4,10 @@ import { useState, useEffect, useRef } from "react";
 import { fetchAPI } from "../../lib/api";
 
 const defaultStats = [
-    { value: 1240, suffix: "+", label: "Internships Indexed", icon: "🏢", key: "active_internships" },
-    { value: 95, suffix: "%", label: "Match Accuracy", icon: "🎯", key: "accuracy" },
-    { value: 850, suffix: "+", label: "Resumes Analyzed", icon: "📄", key: "resumes_analyzed" },
-    { value: 50, suffix: "+", label: "Companies Hiring", icon: "⚡", key: "companies_hiring" },
+    { value: 1240, suffix: "+", label: "Internships Indexed", key: "active_internships" },
+    { value: 95, suffix: "%", label: "Match Accuracy", key: "accuracy" },
+    { value: 850, suffix: "+", label: "Resumes Analyzed", key: "resumes_analyzed" },
+    { value: 50, suffix: "+", label: "Companies Hiring", key: "companies_hiring" },
 ];
 
 export default function StatsSection() {
@@ -16,30 +16,24 @@ export default function StatsSection() {
     useEffect(() => {
         const loadStats = async () => {
             try {
-                const data = await fetchAPI('/stats');
+                const data = await fetchAPI("/stats");
                 const newStats = defaultStats.map(stat => {
-                    if (data[stat.key] !== undefined) {
-                        return { ...stat, value: data[stat.key] };
-                    }
+                    if (data[stat.key] !== undefined) return { ...stat, value: data[stat.key] };
                     return stat;
                 });
                 setStatsData(newStats);
-            } catch (err) {
-                // console.error("Failed to load stats", err);
-                // Keep defaults on error
-            }
-        }
+            } catch { /* keep defaults */ }
+        };
         loadStats();
     }, []);
 
     return (
-        <section style={counterStyles.section}>
-            <div style={counterStyles.grid}>
-                {statsData.map((stat) => (
-                    <div key={stat.label} style={counterStyles.statCard}>
-                        <span style={counterStyles.icon}>{stat.icon}</span>
+        <section style={s.section}>
+            <div style={s.grid}>
+                {statsData.map(stat => (
+                    <div key={stat.label} style={s.statCard}>
                         <AnimatedCounter value={stat.value} suffix={stat.suffix} />
-                        <span style={counterStyles.label}>{stat.label}</span>
+                        <span style={s.label}>{stat.label}</span>
                     </div>
                 ))}
             </div>
@@ -53,80 +47,51 @@ function AnimatedCounter({ value, suffix }) {
     const started = useRef(false);
 
     useEffect(() => {
-        // Reset if value changes considerably or just animate from 0
-        // Ideally we animate from previous value but for now from 0 is fine
         started.current = false;
-
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting && !started.current) {
-                    started.current = true;
-                    const duration = 2000;
-                    const startTime = performance.now();
-
-                    const animate = (currentTime) => {
-                        const elapsed = currentTime - startTime;
-                        const progress = Math.min(elapsed / duration, 1);
-                        // Ease out cubic
-                        const eased = 1 - Math.pow(1 - progress, 3);
-                        setCount(Math.round(eased * value));
-
-                        if (progress < 1) {
-                            requestAnimationFrame(animate);
-                        } else {
-                            setCount(value); // Ensure exact final value
-                        }
-                    };
-
-                    requestAnimationFrame(animate);
-                }
-            },
-            { threshold: 0.3 }
-        );
-
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting && !started.current) {
+                started.current = true;
+                const duration = 2000;
+                const startTime = performance.now();
+                const animate = (now) => {
+                    const elapsed = now - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    setCount(Math.round(eased * value));
+                    if (progress < 1) requestAnimationFrame(animate);
+                    else setCount(value);
+                };
+                requestAnimationFrame(animate);
+            }
+        }, { threshold: 0.3 });
         if (ref.current) observer.observe(ref.current);
         return () => observer.disconnect();
     }, [value]);
 
     return (
-        <span ref={ref} className="gradient-text" style={counterStyles.value}>
-            {count.toLocaleString()}
-            {suffix}
+        <span ref={ref} style={s.value}>
+            {count.toLocaleString()}{suffix}
         </span>
     );
 }
 
-const counterStyles = {
+const s = {
     section: {
-        maxWidth: "1200px",
-        margin: "0 auto",
-        padding: "80px 24px",
+        maxWidth: "1200px", margin: "0 auto", padding: "80px 24px",
+        borderBottom: "1px solid var(--surface-border)",
     },
     grid: {
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-        gap: "32px",
+        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "24px",
     },
     statCard: {
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "8px",
-        padding: "32px 16px",
-        textAlign: "center",
-    },
-    icon: {
-        fontSize: "2rem",
-        marginBottom: "4px",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        gap: "4px", padding: "24px 16px", textAlign: "center",
     },
     value: {
-        fontSize: "clamp(2rem, 4vw, 3rem)",
-        fontWeight: 800,
-        letterSpacing: "-0.02em",
+        fontSize: "clamp(2rem, 4vw, 2.8rem)", fontWeight: 800,
+        letterSpacing: "-0.03em", color: "var(--primary)",
     },
     label: {
-        fontSize: "0.9rem",
-        color: "var(--foreground-secondary)",
-        fontWeight: 500,
+        fontSize: "0.88rem", color: "var(--foreground-secondary)", fontWeight: 500,
     },
 };

@@ -31,7 +31,6 @@ class InternshalaScraper:
         """
         # Build the URL slug
         slug_parts = []
-
         # Work-from-home prefix
         if work_type and work_type.lower() in ("remote", "work from home"):
             slug_parts.append("work-from-home")

@@ -25,7 +25,6 @@ export async function fetchAPI(endpoint, options = {}) {
 
         return await res.json();
     } catch (error) {
-        console.error(`API request failed: ${endpoint}`, error);
         throw error;
     }
 }

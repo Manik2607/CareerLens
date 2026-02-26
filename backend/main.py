@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import auth, resume, preferences, internships, recommendations, stats, profile, skill_gap
+from routers import auth, resume, preferences, internships, recommendations, stats, profile, skill_gap, bookmarks, applications, dashboard
 
 logger = logging.getLogger("main")
 logger.setLevel(logging.INFO)
@@ -81,6 +81,9 @@ app.include_router(recommendations.router)
 app.include_router(stats.router)
 app.include_router(profile.router)
 app.include_router(skill_gap.router)
+app.include_router(bookmarks.router)
+app.include_router(applications.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/")

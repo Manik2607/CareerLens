@@ -82,6 +82,10 @@ export default function RecommendationsPage() {
     // Advanced filters toggle
     const [showFilters, setShowFilters] = useState(false);
 
+    // Bookmark & application tracking state
+    const [savedIds, setSavedIds] = useState(new Set());
+    const [appliedIds, setAppliedIds] = useState(new Set());
+
     // ── Load user, preferences, and recommendations ──
     useEffect(() => {
         const init = async () => {
@@ -125,6 +129,16 @@ export default function RecommendationsPage() {
             }
 
             fetchRecommendations(user.id);
+
+            // Load saved & applied IDs
+            try {
+                const bms = await fetchAPI(`/bookmarks/${user.id}`);
+                if (bms) setSavedIds(new Set(bms.map(b => b.internship_id)));
+            } catch (e) { /* table may not exist yet */ }
+            try {
+                const apps = await fetchAPI(`/applications/${user.id}`);
+                if (apps) setAppliedIds(new Set(apps.map(a => a.internship_id)));
+            } catch (e) { /* table may not exist yet */ }
         };
         init();
     }, []);
@@ -155,6 +169,37 @@ export default function RecommendationsPage() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // ── Bookmark / Track handlers ──
+    const toggleBookmark = async (internshipId) => {
+        if (!user) return;
+        const isSaved = savedIds.has(internshipId);
+        // Optimistic UI update
+        if (isSaved) {
+            setSavedIds(prev => { const n = new Set(prev); n.delete(internshipId); return n; });
+        } else {
+            setSavedIds(prev => new Set(prev).add(internshipId));
+        }
+        try {
+            if (isSaved) {
+                await fetchAPI(`/bookmarks/${user.id}/${internshipId}`, { method: "DELETE" });
+            } else {
+                await fetchAPI(`/bookmarks/${user.id}`, { method: "POST", body: { internship_id: internshipId } });
+            }
+        } catch (e) { /* silently handled — UI already updated */ }
+    };
+
+    const trackApplication = async (internshipId, applyUrl) => {
+        if (!user) return;
+        // Optimistic UI update
+        setAppliedIds(prev => new Set(prev).add(internshipId));
+        if (applyUrl) {
+            window.open(applyUrl, "_blank", "noopener,noreferrer");
+        }
+        try {
+            await fetchAPI(`/applications/${user.id}`, { method: "POST", body: { internship_id: internshipId, status: "Applied" } });
+        } catch (e) { /* silently handled — UI already updated */ }
     };
 
     // ── Client-side filtering & sorting ──
@@ -605,17 +650,19 @@ export default function RecommendationsPage() {
                                     </div>
 
                                     <div style={styles.cardActions}>
-                                        <a
-                                            href={rec.apply_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="btn btn-primary"
-                                            style={{ ...styles.applyBtn, textDecoration: 'none', display: 'inline-block' }}
-                                        >
-                                            Apply Now
-                                        </a>
-                                        <button className="btn btn-ghost" style={styles.saveBtn}>
-                                            Save
+                                        {appliedIds.has(rec.id) ? (
+                                            <span style={{ padding: "10px 22px", borderRadius: "var(--radius-full)", background: "var(--success-light)", color: "var(--success)", fontWeight: 700, fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                                                Applied
+                                            </span>
+                                        ) : (
+                                            <button className="btn btn-primary" style={styles.applyBtn} onClick={() => trackApplication(rec.id, rec.apply_url)}>
+                                                Apply
+                                            </button>
+                                        )}
+                                        <button className="btn btn-ghost" style={styles.saveBtn} onClick={() => toggleBookmark(rec.id)}>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill={savedIds.has(rec.id) ? "var(--primary)" : "none"} stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "6px", verticalAlign: "middle" }}><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                                            {savedIds.has(rec.id) ? "Saved" : "Save"}
                                         </button>
                                     </div>
                                 </div>

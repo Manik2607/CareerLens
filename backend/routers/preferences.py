@@ -20,9 +20,9 @@ router = APIRouter(prefix="/api/preferences", tags=["Preferences"])
 @router.post("/{user_id}")
 async def set_preferences(user_id: str, prefs: PreferencesRequest, background_tasks: BackgroundTasks):
     logger.info(f"Setting preferences for user: {user_id}")
-    logger.info(f"Preferences: {prefs.dict()}")
+    logger.info(f"Preferences: {prefs.model_dump()}")
 
-    data = prefs.dict(exclude_unset=True)
+    data = prefs.model_dump(exclude_unset=True)
     data["user_id"] = user_id
 
     try:

@@ -10,6 +10,7 @@ export default function Signup() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
     const [showPassword, setShowPassword] = useState(false)
+    const [signupSuccess, setSignupSuccess] = useState(false)
     const router = useRouter()
 
     const handleSignup = async (e) => {
@@ -27,13 +28,7 @@ export default function Signup() {
                 const data = await res.json()
                 throw new Error(data.detail || 'Signup failed')
             }
-            const data = await res.json()
-            // Store JWT token
-            if (data.access_token) {
-                localStorage.setItem('auth_token', data.access_token)
-                localStorage.setItem('auth_user', JSON.stringify({ id: data.user_id, email: data.email }))
-            }
-            router.push('/')
+            setSignupSuccess(true)
         } catch (err) {
             setError(err.message)
         } finally {
@@ -58,8 +53,8 @@ export default function Signup() {
                     <Link href="/" style={s.logoLink}>
                         <div style={s.logoMark}>
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-                                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
                             </svg>
                         </div>
                         <span style={s.logoText}>CareerLens</span>
@@ -76,7 +71,7 @@ export default function Signup() {
                         {highlights.map((h, i) => (
                             <div key={h.title} className={`animate-fade-in-up delay-${(i + 2) * 100}`} style={s.featureItem}>
                                 <div style={s.featureDot}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                                 </div>
                                 <div>
                                     <span style={s.featureTitle}>{h.title}</span>
@@ -87,50 +82,101 @@ export default function Signup() {
                     </div>
                 </div>
 
-                {/* Right form */}
+                {/* Right form / Success message */}
                 <div className="animate-fade-in-up delay-200" style={s.formWrap}>
                     <div style={s.formCard} className="card">
-                        <div style={s.formHeader}>
-                            <h2 style={s.formTitle}>Create Account</h2>
-                            <p style={s.formSubtitle}>Fill in your details to get started</p>
-                        </div>
-
-                        {error && (
-                            <div style={s.errorBox}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                                {error}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSignup} style={s.form}>
-                            <div style={s.inputGroup}>
-                                <label style={s.label}>Full Name</label>
-                                <input type="text" required placeholder="John Doe" style={s.input} value={fullName} onChange={e => setFullName(e.target.value)} className="auth-input" />
-                            </div>
-                            <div style={s.inputGroup}>
-                                <label style={s.label}>Email Address</label>
-                                <input type="email" required placeholder="you@example.com" style={s.input} value={email} onChange={e => setEmail(e.target.value)} className="auth-input" />
-                            </div>
-                            <div style={s.inputGroup}>
-                                <label style={s.label}>Password</label>
-                                <div style={{ position: 'relative' }}>
-                                    <input type={showPassword ? 'text' : 'password'} required placeholder="Min. 6 characters" style={s.input} value={password} onChange={e => setPassword(e.target.value)} className="auth-input" />
-                                    <button type="button" onClick={() => setShowPassword(!showPassword)} style={s.eyeBtn}>
-                                        {showPassword ? 'Hide' : 'Show'}
-                                    </button>
+                        {signupSuccess ? (
+                            /* ── Email Verification Notice ── */
+                            <div style={s.successContainer}>
+                                <div style={s.successIconWrap}>
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                                    </svg>
                                 </div>
+                                <h2 style={s.successTitle}>Check your email</h2>
+                                <p style={s.successDesc}>
+                                    We&apos;ve sent a verification link to
+                                </p>
+                                <p style={s.successEmail}>{email}</p>
+
+                                <div style={s.stepsCard}>
+                                    <p style={s.stepsHeading}>To complete your registration:</p>
+                                    <div style={s.step}>
+                                        <span style={s.stepNumber}>1</span>
+                                        <span style={s.stepText}>Open your email inbox (check spam/junk folder too)</span>
+                                    </div>
+                                    <div style={s.step}>
+                                        <span style={s.stepNumber}>2</span>
+                                        <span style={s.stepText}>Click the <strong>verification link</strong> in the email from CareerLens</span>
+                                    </div>
+                                    <div style={s.step}>
+                                        <span style={s.stepNumber}>3</span>
+                                        <span style={s.stepText}>Come back here and <strong>log in</strong> with your credentials</span>
+                                    </div>
+                                </div>
+
+                                <Link href="/login" style={s.goToLoginBtn} className="btn btn-primary">
+                                    Go to Login
+                                </Link>
+
+                                <p style={s.resendText}>
+                                    Didn&apos;t receive the email? Check your spam folder or{' '}
+                                    <button
+                                        type="button"
+                                        onClick={() => { setSignupSuccess(false); setError(null) }}
+                                        style={s.resendLink}
+                                    >
+                                        try signing up again
+                                    </button>
+                                </p>
                             </div>
-                            <button type="submit" disabled={loading} style={s.submitBtn} className="btn btn-primary">
-                                {loading ? (<><span style={s.spinner}/>Creating account...</>) : 'Create Account'}
-                            </button>
-                        </form>
+                        ) : (
+                            /* ── Signup Form ── */
+                            <>
+                                <div style={s.formHeader}>
+                                    <h2 style={s.formTitle}>Create Account</h2>
+                                    <p style={s.formSubtitle}>Fill in your details to get started</p>
+                                </div>
 
-                        <div style={s.divider}><span style={s.dividerLine}/><span style={s.dividerText}>or</span><span style={s.dividerLine}/></div>
+                                {error && (
+                                    <div style={s.errorBox}>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
+                                        {error}
+                                    </div>
+                                )}
 
-                        <p style={s.switchText}>
-                            Already have an account?{' '}
-                            <Link href="/login" style={s.switchLink} className="auth-link">Log in</Link>
-                        </p>
+                                <form onSubmit={handleSignup} style={s.form}>
+                                    <div style={s.inputGroup}>
+                                        <label style={s.label}>Full Name</label>
+                                        <input type="text" required placeholder="John Doe" style={s.input} value={fullName} onChange={e => setFullName(e.target.value)} className="auth-input" />
+                                    </div>
+                                    <div style={s.inputGroup}>
+                                        <label style={s.label}>Email Address</label>
+                                        <input type="email" required placeholder="you@example.com" style={s.input} value={email} onChange={e => setEmail(e.target.value)} className="auth-input" />
+                                    </div>
+                                    <div style={s.inputGroup}>
+                                        <label style={s.label}>Password</label>
+                                        <div style={{ position: 'relative' }}>
+                                            <input type={showPassword ? 'text' : 'password'} required placeholder="Min. 6 characters" style={s.input} value={password} onChange={e => setPassword(e.target.value)} className="auth-input" />
+                                            <button type="button" onClick={() => setShowPassword(!showPassword)} style={s.eyeBtn}>
+                                                {showPassword ? 'Hide' : 'Show'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <button type="submit" disabled={loading} style={s.submitBtn} className="btn btn-primary">
+                                        {loading ? (<><span style={s.spinner} />Creating account...</>) : 'Create Account'}
+                                    </button>
+                                </form>
+
+                                <div style={s.divider}><span style={s.dividerLine} /><span style={s.dividerText}>or</span><span style={s.dividerLine} /></div>
+
+                                <p style={s.switchText}>
+                                    Already have an account?{' '}
+                                    <Link href="/login" style={s.switchLink} className="auth-link">Log in</Link>
+                                </p>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -203,4 +249,65 @@ const s = {
     dividerText: { fontSize: '0.78rem', color: 'var(--foreground-muted)', fontWeight: 500 },
     switchText: { textAlign: 'center', fontSize: '0.88rem', color: 'var(--foreground-secondary)' },
     switchLink: { color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' },
+    // ── Success / Verification Notice styles ──
+    successContainer: {
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        textAlign: 'center', padding: '8px 0',
+    },
+    successIconWrap: {
+        width: '64px', height: '64px', borderRadius: '50%',
+        background: 'var(--primary-light, rgba(99,102,241,0.12))',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        marginBottom: '20px',
+    },
+    successTitle: {
+        fontSize: '1.35rem', fontWeight: 800, color: 'var(--foreground)',
+        marginBottom: '8px',
+    },
+    successDesc: {
+        fontSize: '0.9rem', color: 'var(--foreground-muted)',
+        lineHeight: 1.5, marginBottom: '4px',
+    },
+    successEmail: {
+        fontSize: '0.92rem', fontWeight: 700, color: 'var(--primary)',
+        marginBottom: '24px', wordBreak: 'break-all',
+    },
+    stepsCard: {
+        width: '100%', background: 'var(--surface, #f8f9fb)',
+        borderRadius: 'var(--radius-md, 10px)',
+        border: '1px solid var(--surface-border, #e5e7eb)',
+        padding: '20px', marginBottom: '24px', textAlign: 'left',
+    },
+    stepsHeading: {
+        fontSize: '0.82rem', fontWeight: 700, color: 'var(--foreground)',
+        marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.04em',
+    },
+    step: {
+        display: 'flex', alignItems: 'flex-start', gap: '12px',
+        marginBottom: '12px',
+    },
+    stepNumber: {
+        width: '24px', height: '24px', borderRadius: '50%',
+        background: 'var(--primary)', color: '#fff',
+        fontSize: '0.75rem', fontWeight: 700,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, marginTop: '1px',
+    },
+    stepText: {
+        fontSize: '0.85rem', color: 'var(--foreground-secondary)',
+        lineHeight: 1.5,
+    },
+    goToLoginBtn: {
+        width: '100%', padding: '12px', fontSize: '0.92rem',
+        textAlign: 'center', textDecoration: 'none', display: 'block',
+        marginBottom: '16px',
+    },
+    resendText: {
+        fontSize: '0.8rem', color: 'var(--foreground-muted)', lineHeight: 1.5,
+    },
+    resendLink: {
+        background: 'none', border: 'none', color: 'var(--primary)',
+        fontWeight: 600, cursor: 'pointer', fontSize: '0.8rem',
+        textDecoration: 'underline', padding: 0,
+    },
 }

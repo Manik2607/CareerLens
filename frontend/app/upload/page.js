@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { uploadFile, fetchAPI } from "../../lib/api";
-import { supabase } from "../../lib/supabase";
+import { auth } from "../../lib/auth";
 import { useRouter } from "next/navigation";
 
 const ACCEPTED_EXTENSIONS = [".pdf", ".doc", ".docx", ".txt"];
@@ -22,7 +22,7 @@ export default function UploadPage() {
 
     useEffect(() => {
         const getUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await auth.getUser();
             setUser(user);
         };
         getUser();

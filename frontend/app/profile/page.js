@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabase";
+import { auth } from "../../lib/auth";
 import { fetchAPI } from "../../lib/api";
 import Link from "next/link";
 
@@ -33,7 +33,7 @@ export default function ProfilePage() {
 
     useEffect(() => {
         const getUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await auth.getUser();
             if (!user) {
                 setLoading(false);
                 return;

@@ -1,74 +1,85 @@
-from fastapi import APIRouter, HTTPException, Depends
-from models.schemas import UserSignup, UserLogin, UserProfile
-from supabase_client import supabase
+from fastapi import APIRouter, HTTPException
+from models.schemas import UserSignup, UserLogin, UserProfile, TokenResponse
+from mongodb import get_users_collection
+from jwt_utils import hash_password, verify_password, create_access_token
+from bson import ObjectId
+from datetime import datetime
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
-@router.post("/signup", response_model=UserProfile)
+@router.post("/signup", response_model=TokenResponse)
 async def signup(user: UserSignup):
     try:
-        # Sign up with Supabase Auth
-        auth_response = supabase.auth.sign_up({
-            "email": user.email,
-            "password": user.password,
-            "options": {
-                "data": {
-                    "full_name": user.full_name
-                }
-            }
-        })
+        users_col = get_users_collection()
         
-        if not auth_response.user:
-            raise HTTPException(status_code=400, detail="Signup failed")
-            
-        # Create profile entry
-        # Note: If Supabase trigger is set up, this might be redundant, but good to ensure
-        try:
-            supabase.table("profiles").insert({
-                "id": auth_response.user.id,
-                "email": user.email,
-                "full_name": user.full_name
-            }).execute()
-        except Exception as e:
-            # If profile creation fails, we might want to rollback auth user or just log
-            print(f"Error creating profile: {e}")
-            
-        return UserProfile(
-            id=auth_response.user.id,
-            email=user.email,
-            full_name=user.full_name,
-            created_at=auth_response.user.created_at
+        # Check if user already exists
+        existing_user = users_col.find_one({"email": user.email})
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Hash password
+        hashed_password = hash_password(user.password)
+        
+        # Create new user
+        new_user = {
+            "email": user.email,
+            "password": hashed_password,
+            "full_name": user.full_name,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        result = users_col.insert_one(new_user)
+        user_id = str(result.inserted_id)
+        
+        # Create JWT token
+        token = create_access_token(user_id)
+        
+        return TokenResponse(
+            access_token=token,
+            token_type="bearer",
+            user_id=user_id,
+            email=user.email
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Signup failed: {str(e)}")
 
-@router.post("/login")
+@router.post("/login", response_model=TokenResponse)
 async def login(user: UserLogin):
     try:
-        auth_response = supabase.auth.sign_in_with_password({
-            "email": user.email,
-            "password": user.password
-        })
+        users_col = get_users_collection()
         
-        if not auth_response.session:
-             raise HTTPException(status_code=401, detail="Invalid credentials")
-             
-        return {
-            "access_token": auth_response.session.access_token,
-            "token_type": "bearer",
-            "user": {
-                "id": auth_response.user.id,
-                "email": auth_response.user.email,
-                "full_name": auth_response.user.user_metadata.get("full_name")
-            }
-        }
+        # Find user by email
+        db_user = users_col.find_one({"email": user.email})
+        if not db_user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        # Verify password
+        if not verify_password(user.password, db_user["password"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        # Create JWT token
+        user_id = str(db_user["_id"])
+        token = create_access_token(user_id)
+        
+        return TokenResponse(
+            access_token=token,
+            token_type="bearer",
+            user_id=user_id,
+            email=db_user["email"]
+        )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Login failed: {str(e)}")
 
 @router.post("/logout")
 async def logout():
+    """Logout endpoint (token invalidation handled on frontend)"""
     try:
-        supabase.auth.sign_out()
         return {"message": "Logged out successfully"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+

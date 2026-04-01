@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { fetchAPI } from "../../lib/api";
-import { supabase } from "../../lib/supabase";
+import { auth } from "../../lib/auth";
 import { useRouter } from "next/navigation";
 
 const WORK_TYPE_OPTIONS = ["All", "Remote", "In-office", "Hybrid"];
@@ -89,7 +89,7 @@ export default function RecommendationsPage() {
     // ── Load user, preferences, and recommendations ──
     useEffect(() => {
         const init = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await auth.getUser();
             if (!user) {
                 setLoading(false);
                 return;

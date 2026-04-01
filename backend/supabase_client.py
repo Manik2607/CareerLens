@@ -1,25 +1,40 @@
-from supabase import create_client, Client
-from config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
+# Compatibility layer - all routers use MongoDB now via mongodb.py
+# This file is deprecated but kept for backward compatibility with older router files
+# All new code should import from mongodb.py instead
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    # raising error might stop the server ifenv not set, maybe just warn?
-    # actually better to fail fast for critical config
-    print("Warning: Supabase URL or Key not set. Supabase client will fail.")
+class StubSupabaseClient:
+    """Stub Supabase client - not used, kept for backward compatibility"""
+    def __init__(self):
+        pass
+    
+    def table(self, name):
+        return self
+    
+    def select(self, *args, **kwargs):
+        return self
+    
+    def eq(self, *args, **kwargs):
+        return self
+    
+    def insert(self, data):
+        return self
+    
+    def update(self, data):
+        return self
+    
+    def order(self, column, desc=False):
+        return self
+    
+    def limit(self, num):
+        return self
+    
+    def execute(self):
+        return StubResponse()
 
-try:
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        raise ValueError("Missing SUPABASE_URL or SUPABASE_KEY")
-    # Using 'key' argument for clarity if needed, but positional is (url, key)
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-except Exception as e:
-    print(f"CRITICAL ERROR initializing Supabase client: {e}")
-    # Don't silence it, otherwise imports will fail with confusing NoneType error
-    raise e
+class StubResponse:
+    def __init__(self):
+        self.data = []
 
-# Use service role key for admin tasks if available
-supabase_admin: Client = None
-if SUPABASE_SERVICE_KEY:
-    try:
-        supabase_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    except Exception as e:
-        print(f"Error initializing Supabase admin client: {e}")
+# Create stub instances
+supabase = StubSupabaseClient()
+supabase_admin = StubSupabaseClient()

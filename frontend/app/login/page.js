@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { auth } from '../../lib/auth'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -17,8 +17,9 @@ export default function Login() {
         setLoading(true)
         setError(null)
         try {
-            const { error } = await supabase.auth.signInWithPassword({ email, password })
-            if (error) throw error
+            const { user, error: authError } = await auth.signInWithPassword({ email, password })
+            if (authError) throw new Error(authError)
+            if (!user) throw new Error('Login failed')
             router.push('/')
             router.refresh()
         } catch (err) {

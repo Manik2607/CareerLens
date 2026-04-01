@@ -6,11 +6,16 @@ from pathlib import Path
 env_path = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+# MongoDB Configuration
+MONGODB_URI = os.getenv("MONGODB_URI")
+MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "careerlens")
 
-if not SUPABASE_URL:
-    print(f"CRITICAL WARNING: SUPABASE_URL is not set in {env_path}")
-if not SUPABASE_KEY:
-    print(f"CRITICAL WARNING: SUPABASE_KEY is not set in {env_path}")
+# JWT Configuration
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-super-secret-key-change-this-in-production")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
+
+if not MONGODB_URI:
+    print(f"CRITICAL WARNING: MONGODB_URI is not set in {env_path}")
+if JWT_SECRET_KEY == "your-super-secret-key-change-this-in-production":
+    print(f"WARNING: Using default JWT_SECRET_KEY. Change this in production!")

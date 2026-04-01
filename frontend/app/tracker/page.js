@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { fetchAPI } from "../../lib/api";
-import { supabase } from "../../lib/supabase";
+import { auth } from "../../lib/auth";
 import Link from "next/link";
 
 const STATUSES = ["Applied", "Interview", "Offer", "Rejected", "Withdrawn"];
@@ -25,7 +25,7 @@ export default function TrackerPage() {
 
     useEffect(() => {
         const init = async () => {
-            const { data: { user: u } } = await supabase.auth.getUser();
+            const { data: { user: u } } = await auth.getUser();
             if (!u) { setLoading(false); return; }
             setUser(u);
             loadApplications(u.id);

@@ -13,8 +13,14 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: str
+    email: str
+
 class UserProfile(BaseModel):
-    id: UUID
+    id: str
     email: str
     full_name: Optional[str] = None
     created_at: datetime

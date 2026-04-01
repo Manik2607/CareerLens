@@ -1,7 +1,14 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
+// Get token from localStorage
+function getAuthToken() {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('auth_token');
+}
+
 export async function fetchAPI(endpoint, options = {}) {
     const { method = 'GET', body, headers = {} } = options;
+    const token = getAuthToken();
 
     const config = {
         method,
@@ -10,6 +17,11 @@ export async function fetchAPI(endpoint, options = {}) {
             ...headers,
         },
     };
+
+    // Add JWT token if available
+    if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+    }
 
     if (body) {
         config.body = JSON.stringify(body);
@@ -29,22 +41,29 @@ export async function fetchAPI(endpoint, options = {}) {
     }
 }
 
-export async function uploadFile(file, userId) {
+export async function uploadFile(file) {
     console.log('[uploadFile] Starting upload...');
     console.log('[uploadFile] File:', file.name, 'Size:', file.size, 'Type:', file.type);
-    console.log('[uploadFile] User ID:', userId);
-    console.log('[uploadFile] API URL:', `${API_BASE_URL}/resume/upload`);
+    const token = getAuthToken();
+    console.log('[uploadFile] Token present:', !!token);
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('user_id', userId);
 
     try {
-        const res = await fetch(`${API_BASE_URL}/resume/upload`, {
+        const config = {
             method: 'POST',
             body: formData,
-            // Do NOT set Content-Type header — browser auto-sets it with boundary for FormData
-        });
+        };
+
+        // Add JWT token if available
+        if (token) {
+            config.headers = {
+                'Authorization': `Bearer ${token}`,
+            };
+        }
+
+        const res = await fetch(`${API_BASE_URL}/resume/upload`, config);
 
         console.log('[uploadFile] Response status:', res.status, res.statusText);
 

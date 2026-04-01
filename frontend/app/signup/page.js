@@ -27,7 +27,13 @@ export default function Signup() {
                 const data = await res.json()
                 throw new Error(data.detail || 'Signup failed')
             }
-            router.push('/login?message=Signup successful, please login')
+            const data = await res.json()
+            // Store JWT token
+            if (data.access_token) {
+                localStorage.setItem('auth_token', data.access_token)
+                localStorage.setItem('auth_user', JSON.stringify({ id: data.user_id, email: data.email }))
+            }
+            router.push('/')
         } catch (err) {
             setError(err.message)
         } finally {

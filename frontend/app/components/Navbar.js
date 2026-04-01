@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { supabase } from "../../lib/supabase";
+import { auth } from "../../lib/auth";
 import { useTheme } from "./ThemeProvider";
 
 export default function Navbar() {
@@ -15,14 +15,22 @@ export default function Navbar() {
 
     useEffect(() => {
         const checkUser = async () => {
-            const { data } = await supabase.auth.getUser();
+            const { data } = await auth.getUser();
             setUser(data?.user ?? null);
         };
         checkUser();
-        const { data: authListener } = supabase.auth.onAuthStateChange((_, session) => {
-            setUser(session?.user ?? null);
+        const unsubscribe = auth.onAuthStateChange((state, session) => {
+            if (state === 'SIGNED_IN') {
+                setUser(session?.user ?? null);
+            } else {
+                setUser(null);
+            }
         });
-        return () => authListener?.subscription.unsubscribe();
+        return () => {
+            if (unsubscribe?.data?.subscription?.unsubscribe) {
+                unsubscribe.data.subscription.unsubscribe();
+            }
+        };
     }, []);
 
     useEffect(() => {
@@ -36,7 +44,7 @@ export default function Navbar() {
     }, [pathname]);
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
+        await auth.signOut();
         window.location.href = "/";
     };
 

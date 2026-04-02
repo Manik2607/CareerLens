@@ -17,13 +17,23 @@ export default function Login() {
         setLoading(true)
         setError(null)
         try {
-            const { user, error: authError } = await auth.signInWithPassword({ email, password })
-            if (authError) throw new Error(authError)
-            if (!user) throw new Error('Login failed')
+            const { data, error: authError } = await auth.signInWithPassword({ email, password })
+            
+            if (authError) {
+                console.error('Supabase auth error:', authError)
+                throw new Error(authError.message || 'Login failed')
+            }
+            
+            if (!data?.user) {
+                throw new Error('No user returned from login')
+            }
+            
+            console.log('Login successful, user:', data.user)
             router.push('/')
             router.refresh()
         } catch (err) {
-            setError(err.message)
+            console.error('Login error:', err)
+            setError(err.message || 'An error occurred during login. Please try again.')
         } finally {
             setLoading(false)
         }

@@ -1,11 +1,12 @@
 fastapi
 uvicorn
-supabase
+pymongo
+PyJWT
+bcrypt
 PyPDF2
 python-docx
 python-multipart
 beautifulsoup4
 httpx
-python-jose[cryptography]
 pydantic
 python-dotenv

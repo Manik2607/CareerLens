@@ -1,8 +1,10 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException, Form
-from supabase_client import supabase
+from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Depends
+from mongodb import get_resumes_collection
+from auth_dependencies import get_current_user
 from services.resume_parser import ResumeParser
 from services.ats_scorer import ATSScorer
-import uuid
+from datetime import datetime
+from bson import ObjectId
 import traceback
 import logging
 
@@ -22,11 +24,10 @@ router = APIRouter(prefix="/api/resume", tags=["Resume"])
 @router.post("/upload")
 async def upload_resume(
     file: UploadFile = File(...),
-    user_id: str = Form(...)
+    user_id: str = Depends(get_current_user)
 ):
     """
-    Upload a resume file, parse it, score it, and store results in Supabase DB.
-    File storage is skipped — only extracted data is saved.
+    Upload a resume file, parse it, score it, and store results in MongoDB.
     """
     logger.info("=" * 60)
     logger.info("RESUME UPLOAD STARTED")
@@ -82,20 +83,23 @@ async def upload_resume(
             logger.error(f"[Step 4] ❌ Scoring failed: {e}")
             score = 0
 
-        # Step 5: Save to Supabase DB (no file storage, just data)
+        # Step 5: Save to MongoDB
         logger.info("[Step 5] Saving to database...")
         data = {
-            "user_id": user_id,
+            "user_id": ObjectId(user_id),
             "file_name": file.filename,
             "file_url": "",
             "extracted_text": text,
             "skills": skills,
-            "ats_score": score
+            "ats_score": score,
+            "created_at": datetime.utcnow()
         }
 
         try:
-            response = supabase.table("resumes").insert(data).execute()
-            logger.info(f"[Step 5] ✅ Saved! Row: {response.data}")
+            resumes_col = get_resumes_collection()
+            result = resumes_col.insert_one(data)
+            resume_id = str(result.inserted_id)
+            logger.info(f"[Step 5] ✅ Saved! ID: {resume_id}")
         except Exception as db_err:
             logger.error(f"[Step 5] ❌ DB insert failed: {db_err}")
             logger.error(traceback.format_exc())
@@ -104,13 +108,14 @@ async def upload_resume(
                 detail=f"Failed to save resume: {str(db_err)}"
             )
 
-        if not response.data:
-            logger.error("[Step 5] ❌ DB returned empty data (RLS issue?)")
-            raise HTTPException(status_code=500, detail="Database returned no data")
-
-        result = response.data[0]
-        logger.info(f"✅ UPLOAD COMPLETE — ID: {result.get('id')}, Score: {score}")
-        return result
+        logger.info(f"✅ UPLOAD COMPLETE — ID: {resume_id}, Score: {score}")
+        return {
+            "id": resume_id,
+            "file_name": file.filename,
+            "ats_score": score,
+            "skills": skills,
+            "created_at": data["created_at"]
+        }
 
     except HTTPException:
         raise
@@ -120,14 +125,21 @@ async def upload_resume(
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
-@router.get("/list/{user_id}")
-async def list_resumes(user_id: str):
-    """List all resumes for a given user."""
+@router.get("/list")
+async def list_resumes(user_id: str = Depends(get_current_user)):
+    """List all resumes for the current user."""
     logger.info(f"Listing resumes for user: {user_id}")
     try:
-        response = supabase.table("resumes").select("*").eq("user_id", user_id).execute()
-        logger.info(f"Found {len(response.data)} resumes")
-        return response.data
+        resumes_col = get_resumes_collection()
+        resumes = list(resumes_col.find({"user_id": ObjectId(user_id)}))
+        
+        # Convert ObjectId to string for JSON serialization
+        for resume in resumes:
+            resume["_id"] = str(resume["_id"])
+            resume["user_id"] = str(resume["user_id"])
+        
+        logger.info(f"Found {len(resumes)} resumes")
+        return resumes
     except Exception as e:
         logger.error(f"Error listing resumes: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to list resumes: {str(e)}")

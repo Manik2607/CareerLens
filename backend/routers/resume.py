@@ -1,10 +1,9 @@
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Depends
-from mongodb import get_resumes_collection
+from supabase_client import supabase
 from auth_dependencies import get_current_user
 from services.resume_parser import ResumeParser
 from services.ats_scorer import ATSScorer
 from datetime import datetime
-from bson import ObjectId
 import traceback
 import logging
 
@@ -27,7 +26,7 @@ async def upload_resume(
     user_id: str = Depends(get_current_user)
 ):
     """
-    Upload a resume file, parse it, score it, and store results in MongoDB.
+    Upload a resume file, parse it, score it, and store results in Supabase.
     """
     logger.info("=" * 60)
     logger.info("RESUME UPLOAD STARTED")
@@ -83,22 +82,24 @@ async def upload_resume(
             logger.error(f"[Step 4] ❌ Scoring failed: {e}")
             score = 0
 
-        # Step 5: Save to MongoDB
+        # Step 5: Save to Supabase
         logger.info("[Step 5] Saving to database...")
         data = {
-            "user_id": ObjectId(user_id),
+            "user_id": user_id,
             "file_name": file.filename,
             "file_url": "",
             "extracted_text": text,
             "skills": skills,
             "ats_score": score,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.utcnow().isoformat()
         }
 
         try:
-            resumes_col = get_resumes_collection()
-            result = resumes_col.insert_one(data)
-            resume_id = str(result.inserted_id)
+            result = supabase.table("resumes").insert(data).execute()
+            if not result.data:
+                raise Exception("Failed to insert resume into database")
+            
+            resume_id = result.data[0]["id"]
             logger.info(f"[Step 5] ✅ Saved! ID: {resume_id}")
         except Exception as db_err:
             logger.error(f"[Step 5] ❌ DB insert failed: {db_err}")
@@ -130,14 +131,8 @@ async def list_resumes(user_id: str = Depends(get_current_user)):
     """List all resumes for the current user."""
     logger.info(f"Listing resumes for user: {user_id}")
     try:
-        resumes_col = get_resumes_collection()
-        resumes = list(resumes_col.find({"user_id": ObjectId(user_id)}))
-        
-        # Convert ObjectId to string for JSON serialization
-        for resume in resumes:
-            resume["_id"] = str(resume["_id"])
-            resume["user_id"] = str(resume["user_id"])
-        
+        result = supabase.table("resumes").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+        resumes = result.data if result.data else []
         logger.info(f"Found {len(resumes)} resumes")
         return resumes
     except Exception as e:

@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { auth } from '../../lib/auth'
 
 export default function Signup() {
     const [email, setEmail] = useState('')
@@ -18,16 +19,20 @@ export default function Signup() {
         setLoading(true)
         setError(null)
         try {
-            const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
-            const res = await fetch(`${API_URL}/auth/signup`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, full_name: fullName })
+            // Sign up with Supabase auth
+            const { data, error: authError } = await auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        full_name: fullName
+                    }
+                }
             })
-            if (!res.ok) {
-                const data = await res.json()
-                throw new Error(data.detail || 'Signup failed')
-            }
+            
+            if (authError) throw new Error(authError.message)
+            if (!data.user) throw new Error('Signup failed')
+            
             setSignupSuccess(true)
         } catch (err) {
             setError(err.message)

@@ -20,7 +20,7 @@ SKILL_DATABASE = [
     "rest api", "restful", "microservices",
 
     # Databases
-    "sql", "mysql", "postgresql", "mongodb", "redis", "elasticsearch", "sqlite",
+    "sql", "mysql", "postgresql", "redis", "elasticsearch", "sqlite",
     "oracle", "cassandra", "dynamodb", "firebase", "supabase",
 
     # Cloud & DevOps

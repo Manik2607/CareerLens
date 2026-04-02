@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-pymongo
+supabase
 PyJWT
 bcrypt
 PyPDF2

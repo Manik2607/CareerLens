@@ -1,79 +1,65 @@
 from fastapi import APIRouter, HTTPException
 from models.schemas import UserSignup, UserLogin, UserProfile, TokenResponse
-from mongodb import get_users_collection
-from jwt_utils import hash_password, verify_password, create_access_token
-from bson import ObjectId
+from supabase_client import supabase
 from datetime import datetime
+import logging
+
+logger = logging.getLogger("auth_router")
+logger.setLevel(logging.DEBUG)
+
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    ch.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+    logger.addHandler(ch)
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
-@router.post("/signup", response_model=TokenResponse)
-async def signup(user: UserSignup):
+@router.post("/create-profile")
+async def create_profile(user_id: str, full_name: str = None, email: str = None):
+    """
+    Create a user profile in Supabase. Called after successful Supabase auth signup.
+    """
     try:
-        users_col = get_users_collection()
-        
-        # Check if user already exists
-        existing_user = users_col.find_one({"email": user.email})
-        if existing_user:
-            raise HTTPException(status_code=400, detail="Email already registered")
-        
-        # Hash password
-        hashed_password = hash_password(user.password)
-        
-        # Create new user
-        new_user = {
-            "email": user.email,
-            "password": hashed_password,
-            "full_name": user.full_name,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+        profile_data = {
+            "id": user_id,
+            "email": email,
+            "full_name": full_name,
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
         }
         
-        result = users_col.insert_one(new_user)
-        user_id = str(result.inserted_id)
+        # Remove None values
+        profile_data = {k: v for k, v in profile_data.items() if v is not None}
         
-        # Create JWT token
-        token = create_access_token(user_id)
+        result = supabase.table("profiles").insert(profile_data).execute()
+        if not result.data:
+            raise HTTPException(status_code=400, detail="Failed to create profile")
         
-        return TokenResponse(
-            access_token=token,
-            token_type="bearer",
-            user_id=user_id,
-            email=user.email
-        )
+        return result.data[0]
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Signup failed: {str(e)}")
+        logger.error(f"Create profile error: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to create profile: {str(e)}")
 
-@router.post("/login", response_model=TokenResponse)
-async def login(user: UserLogin):
+@router.get("/profile/{user_id}")
+async def get_profile(user_id: str):
+    """
+    Get a user profile from Supabase.
+    """
     try:
-        users_col = get_users_collection()
+        result = supabase.table("profiles").select("*").eq("id", user_id).execute()
         
-        # Find user by email
-        db_user = users_col.find_one({"email": user.email})
-        if not db_user:
-            raise HTTPException(status_code=401, detail="Invalid email or password")
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Profile not found")
         
-        # Verify password
-        if not verify_password(user.password, db_user["password"]):
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-        
-        # Create JWT token
-        user_id = str(db_user["_id"])
-        token = create_access_token(user_id)
-        
-        return TokenResponse(
-            access_token=token,
-            token_type="bearer",
-            user_id=user_id,
-            email=db_user["email"]
-        )
+        return result.data[0]
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Login failed: {str(e)}")
+        logger.error(f"Get profile error: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to get profile: {str(e)}")
 
 @router.post("/logout")
 async def logout():
